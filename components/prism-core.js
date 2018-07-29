@@ -7,6 +7,24 @@ var _self = (typeof window !== 'undefined')
 	);
 
 /**
+ * @typedef PatternObject
+ * @type {Object}
+ * @property {RegExp} pattern
+ * @property {boolean} [lookbehind=false]
+ * @property {boolean} [greedy=false]
+ * @property {Grammar=} inside
+ * @property {string|string[]} [alias]
+ *
+ * @typedef Pattern
+ * @type {RegExp|PatternObject}
+ *
+ * @typedef GrammarToken
+ * @type {Pattern|Pattern[]}
+ *
+ * @typedef {{[tokenId: string]: GrammarToken; rest: Object.<string, GrammarToken>}} Grammar
+ */
+
+/**
  * Prism: Lightweight, robust, elegant syntax highlighting
  * MIT license http://www.opensource.org/licenses/mit-license.php/
  * @author Lea Verou http://lea.verou.me
@@ -18,7 +36,7 @@ var Prism = (function(){
 var lang = /\blang(?:uage)?-([\w-]+)\b/i;
 var uniqueId = 0;
 
-var _ = _self.Prism = {
+var _ = {
 	manual: _self.Prism && _self.Prism.manual,
 	disableWorkerMessageHandler: _self.Prism && _self.Prism.disableWorkerMessageHandler,
 	util: {
@@ -83,6 +101,13 @@ var _ = _self.Prism = {
 	},
 
 	languages: {
+
+		/**
+		 * Creates a new grammar extending the grammar of the given language id with the given grammar.
+		 * @param {string} id The language id.
+		 * @param {Grammar} redef The tokens to be added.
+		 * @returns {Grammar} The extended grammar.
+		 */
 		extend: function (id, redef) {
 			var lang = _.util.clone(_.languages[id]);
 
@@ -96,11 +121,12 @@ var _ = _self.Prism = {
 		/**
 		 * Insert a token before another token in a language literal
 		 * As this needs to recreate the object (we cannot actually insert before keys in object literals),
-		 * we cannot just provide an object, we need anobject and a key.
-		 * @param inside The key (or language id) of the parent
-		 * @param before The key to insert before. If not provided, the function appends instead.
-		 * @param insert Object with the key/value pairs to insert
-		 * @param root The object that contains `inside`. If equal to Prism.languages, it can be omitted.
+		 * we cannot just provide an object, we need an object and a key.
+		 * @param {string} inside The key (or language id) of the parent
+		 * @param {string} before The key to insert before. If not provided, the function appends instead.
+		 * @param {Grammar} insert Object with the key/value pairs to insert
+		 * @param {Object<string, Grammar>} [root=Prism.languages] The object that contains `inside`. If equal to Prism.languages, it can be omitted.
+		 * @returns {Grammar}
 		 */
 		insertBefore: function (inside, before, insert, root) {
 			root = root || _.languages;
@@ -148,7 +174,9 @@ var _ = _self.Prism = {
 			return root[inside] = ret;
 		},
 
-		// Traverse a language definition with Depth First Search
+		/**
+		 * Traverse a language definition with Depth First Search.
+		 */
 		DFS: function(o, callback, type, visited) {
 			visited = visited || {};
 			for (var i in o) {
@@ -167,12 +195,24 @@ var _ = _self.Prism = {
 			}
 		}
 	},
+
 	plugins: {},
 
+	/**
+	 *
+	 * @param {boolean} [async=false]
+	 * @param {} [callback]
+	 */
 	highlightAll: function(async, callback) {
 		_.highlightAllUnder(document, async, callback);
 	},
 
+	/**
+	 *
+	 * @param {Element} container
+	 * @param {boolean} [async=false]
+	 * @param {} [callback]
+	 */
 	highlightAllUnder: function(container, async, callback) {
 		var env = {
 			callback: callback,
@@ -188,6 +228,12 @@ var _ = _self.Prism = {
 		}
 	},
 
+	/**
+	 *
+	 * @param {HTMLElement} element
+	 * @param {boolean} [async=false]
+	 * @param {(element: HTMLElement) => void} [callback]
+	 */
 	highlightElement: function(element, async, callback) {
 		// Find language
 		var language, grammar, parent = element;
@@ -271,6 +317,12 @@ var _ = _self.Prism = {
 		}
 	},
 
+	/**
+	 *
+	 * @param {string} text
+	 * @param {Grammar} grammar
+	 * @param {string} language The language id.
+	 */
 	highlight: function (text, grammar, language) {
 		var env = {
 			code: text,
@@ -283,11 +335,22 @@ var _ = _self.Prism = {
 		return Token.stringify(_.util.encode(env.tokens), env.language);
 	},
 
+	/**
+	 *
+	 * @private
+	 * @param {string} text
+	 * @param {(string|Token)[]} strarr
+	 * @param {Grammar} grammar
+	 * @param {number} index
+	 * @param {number} startPos
+	 * @param {boolean} [oneshot=false]
+	 * @param {string} [target]
+	 */
 	matchGrammar: function (text, strarr, grammar, index, startPos, oneshot, target) {
 		var Token = _.Token;
 
 		for (var token in grammar) {
-			if(!grammar.hasOwnProperty(token) || !grammar[token]) {
+			if (!grammar.hasOwnProperty(token) || !grammar[token]) {
 				continue;
 			}
 
@@ -295,24 +358,28 @@ var _ = _self.Prism = {
 				return;
 			}
 
+			/**
+			 * @type {PatternObject[]}
+			 */
 			var patterns = grammar[token];
 			patterns = (_.util.type(patterns) === "Array") ? patterns : [patterns];
 
 			for (var j = 0; j < patterns.length; ++j) {
-				var pattern = patterns[j],
-					inside = pattern.inside,
-					lookbehind = !!pattern.lookbehind,
-					greedy = !!pattern.greedy,
+				var patternObject = patterns[j];
+				var pattern = patternObject.pattern,
+					inside = patternObject.inside,
+					lookbehind = !!patternObject.lookbehind,
+					greedy = !!patternObject.greedy,
 					lookbehindLength = 0,
-					alias = pattern.alias;
+					alias = patternObject.alias;
 
-				if (greedy && !pattern.pattern.global) {
+				if (greedy && !pattern.global) {
 					// Without the global flag, lastIndex won't work
-					var flags = pattern.pattern.toString().match(/[imuy]*$/)[0];
-					pattern.pattern = RegExp(pattern.pattern.source, flags + "g");
+					var flags = pattern.toString().match(/[imuy]*$/)[0];
+					pattern = RegExp(pattern.source, flags + "g");
 				}
 
-				pattern = pattern.pattern || pattern;
+				pattern = pattern || patternObject;
 
 				// Don’t cache length as it changes during the loop
 				for (var i = index, pos = startPos; i < strarr.length; pos += strarr[i].length, ++i) {
@@ -411,6 +478,12 @@ var _ = _self.Prism = {
 		}
 	},
 
+	/**
+	 *
+	 * @param {string} text
+	 * @param {Grammar} grammar
+	 * @returns {(string|Token)[]}
+	 */
 	tokenize: function(text, grammar, language) {
 		var strarr = [text];
 
@@ -453,6 +526,7 @@ var _ = _self.Prism = {
 		}
 	}
 };
+_self.Prism = _;
 
 var Token = _.Token = function(type, content, alias, matchedStr, greedy) {
 	this.type = type;
