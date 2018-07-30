@@ -1,6 +1,13 @@
 var components = require('../components.js');
+/**
+ * @type {Object.<string, string[]>=}
+ */
 var peerDependentsMap = null;
 
+/**
+ *
+ * @returns {Object.<string, string[]>}
+ */
 function getPeerDependentsMap() {
 	var peerDependentsMap = {};
 	Object.keys(components.languages).forEach(function (language) {
@@ -8,6 +15,9 @@ function getPeerDependentsMap() {
 			return false;
 		}
 		if (components.languages[language].peerDependencies) {
+			/**
+			 * @type {string|string[]}
+			 */
 			var peerDependencies = components.languages[language].peerDependencies;
 			if (!Array.isArray(peerDependencies)) {
 				peerDependencies = [peerDependencies];
@@ -23,6 +33,11 @@ function getPeerDependentsMap() {
 	return peerDependentsMap;
 }
 
+/**
+ *
+ * @param {string} mainLanguage
+ * @returns {string[]}
+ */
 function getPeerDependents(mainLanguage) {
 	if (!peerDependentsMap) {
 		peerDependentsMap = getPeerDependentsMap();
@@ -30,6 +45,11 @@ function getPeerDependents(mainLanguage) {
 	return peerDependentsMap[mainLanguage] || [];
 }
 
+/**
+ *
+ * @param {string|string[]} [arr]
+ * @param {boolean} [withoutDependencies=false]
+ */
 function loadLanguages(arr, withoutDependencies) {
 	// If no argument is passed, load all components
 	if (!arr) {
@@ -76,6 +96,10 @@ function loadLanguages(arr, withoutDependencies) {
 	});
 }
 
+/**
+ *
+ * @param {string|string[]} [arr]
+ */
 module.exports = function (arr) {
 	// Don't expose withoutDependencies
 	loadLanguages(arr);

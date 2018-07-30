@@ -22,6 +22,68 @@ var _self = (typeof window !== 'undefined')
  * @type {Pattern|Pattern[]}
  *
  * @typedef {{[tokenId: string]: GrammarToken; rest: Object.<string, GrammarToken>}} Grammar
+ *
+ *
+ * @typedef {Object} BeforeHighlightAllEnvironment
+ * @property {Function} [callback]
+ * @property {Element[]} [elements]
+ * @property {string} selector
+ *
+ * @typedef {Object} BeforeSanityCheckEnvironment
+ * @property {string} code
+ * @property {HTMLElement} element
+ * @property {Grammar} [grammar]
+ * @property {string} language
+ *
+ * @typedef {Object} BeforeHighlightEnvironment
+ * @property {string} code
+ * @property {HTMLElement} element
+ * @property {Grammar} [grammar]
+ * @property {string} language
+ *
+ * @typedef {Object} BeforeTokenizeEnvironment
+ * @property {string} code
+ * @property {Grammar} grammar
+ * @property {string} language
+ *
+ * @typedef {Object} AfterTokenizeEnvironment
+ * @property {string} code
+ * @property {Grammar} grammar
+ * @property {string} language
+ * @property {(string|Token)[]} tokens
+ *
+ * @typedef {Object} WrapEnvironment
+ * @property {{[name: string]: string}} attributes
+ * @property {string[]} classes
+ * @property {string} content
+ * @property {string} language
+ * @property {Token|(string|Token)[]} [parent]
+ * @property {string} tag
+ * @property {string} type
+ *
+ * @typedef {Object} BeforeInsertEnvironment
+ * @property {string} code
+ * @property {HTMLElement} element
+ * @property {Grammar} grammar
+ * @property {string} highlightedCode
+ * @property {string} language
+ *
+ * @typedef {Object} AfterHighlightEnvironment
+ * @property {string} code
+ * @property {HTMLElement} element
+ * @property {Grammar} [grammar]
+ * @property {string} [highlightedCode]
+ * @property {string} language
+ *
+ * @typedef {Object} CompleteEnvironment
+ * @property {string} code
+ * @property {HTMLElement} element
+ * @property {Grammar} [grammar]
+ * @property {string} [highlightedCode]
+ * @property {string} language
+ *
+ * @typedef {BeforeHighlightAllEnvironment|BeforeSanityCheckEnvironment|BeforeHighlightEnvironment|BeforeTokenizeEnvironment|AfterTokenizeEnvironment|WrapEnvironment|BeforeInsertEnvironment|AfterHighlightEnvironment|CompleteEnvironment} Environment
+ *
  */
 
 /**
@@ -50,10 +112,20 @@ var _ = {
 			}
 		},
 
+		/**
+		 * Returns the type of the given object.
+		 * @param {Object} o The language id.
+		 * @returns {string} The type of the object.
+		 */
 		type: function (o) {
 			return Object.prototype.toString.call(o).match(/\[object (\w+)\]/)[1];
 		},
 
+		/**
+		 * Gives the given object a unique id if it did not have one already.
+		 * @param {Object} obj The object.
+		 * @returns {number} The id of the object.
+		 */
 		objId: function (obj) {
 			if (!obj['__id']) {
 				Object.defineProperty(obj, '__id', { value: ++uniqueId });
@@ -63,16 +135,18 @@ var _ = {
 
 		// Deep clone a language definition (e.g. to extend it)
 		clone: function (o, visited) {
-			var type = _.util.type(o);
+			var type = _.util.type(o),
+			    objId = _.util.objId;
+
 			visited = visited || {};
 
 			switch (type) {
 				case 'Object':
-					if (visited[_.util.objId(o)]) {
-						return visited[_.util.objId(o)];
+					if (visited[objId(o)]) {
+						return visited[objId(o)];
 					}
 					var clone = {};
-					visited[_.util.objId(o)] = clone;
+					visited[objId(o)] = clone;
 
 					for (var key in o) {
 						if (o.hasOwnProperty(key)) {
@@ -83,11 +157,11 @@ var _ = {
 					return clone;
 
 				case 'Array':
-					if (visited[_.util.objId(o)]) {
-						return visited[_.util.objId(o)];
+					if (visited[objId(o)]) {
+						return visited[objId(o)];
 					}
 					var clone = [];
-					visited[_.util.objId(o)] = clone;
+					visited[objId(o)] = clone;
 
 					o.forEach(function (v, i) {
 						clone[i] = _.util.clone(v, visited);
@@ -103,7 +177,7 @@ var _ = {
 	languages: {
 
 		/**
-		 * Creates a new grammar extending the grammar of the given language id with the given grammar.
+		 * Creates a new grammar extending the existing grammar of the given language id with the given grammar.
 		 * @param {string} id The language id.
 		 * @param {Grammar} redef The tokens to be added.
 		 * @returns {Grammar} The extended grammar.
@@ -201,7 +275,7 @@ var _ = {
 	/**
 	 *
 	 * @param {boolean} [async=false]
-	 * @param {} [callback]
+	 * @param {Function} [callback]
 	 */
 	highlightAll: function(async, callback) {
 		_.highlightAllUnder(document, async, callback);
@@ -211,9 +285,12 @@ var _ = {
 	 *
 	 * @param {Element} container
 	 * @param {boolean} [async=false]
-	 * @param {} [callback]
+	 * @param {Function} [callback]
 	 */
 	highlightAllUnder: function(container, async, callback) {
+		/**
+		 * @type {BeforeHighlightAllEnvironment}
+		 */
 		var env = {
 			callback: callback,
 			selector: 'code[class*="language-"], [class*="language-"] code, code[class*="lang-"], [class*="lang-"] code'
@@ -268,19 +345,21 @@ var _ = {
 			code: code
 		};
 
-		_.hooks.run('before-sanity-check', env);
+		var runHook = _.hooks.run;
+
+		runHook('before-sanity-check', env);
 
 		if (!env.code || !env.grammar) {
 			if (env.code) {
-				_.hooks.run('before-highlight', env);
+				runHook('before-highlight', env);
 				env.element.textContent = env.code;
-				_.hooks.run('after-highlight', env);
+				runHook('after-highlight', env);
 			}
-			_.hooks.run('complete', env);
+			runHook('complete', env);
 			return;
 		}
 
-		_.hooks.run('before-highlight', env);
+		runHook('before-highlight', env);
 
 		if (async && _self.Worker) {
 			var worker = new Worker(_.filename);
@@ -288,13 +367,13 @@ var _ = {
 			worker.onmessage = function(evt) {
 				env.highlightedCode = evt.data;
 
-				_.hooks.run('before-insert', env);
+				runHook('before-insert', env);
 
 				env.element.innerHTML = env.highlightedCode;
 
 				callback && callback.call(env.element);
-				_.hooks.run('after-highlight', env);
-				_.hooks.run('complete', env);
+				runHook('after-highlight', env);
+				runHook('complete', env);
 			};
 
 			worker.postMessage(JSON.stringify({
@@ -306,14 +385,14 @@ var _ = {
 		else {
 			env.highlightedCode = _.highlight(env.code, env.grammar, env.language);
 
-			_.hooks.run('before-insert', env);
+			runHook('before-insert', env);
 
 			env.element.innerHTML = env.highlightedCode;
 
 			callback && callback.call(element);
 
-			_.hooks.run('after-highlight', env);
-			_.hooks.run('complete', env);
+			runHook('after-highlight', env);
+			runHook('complete', env);
 		}
 	},
 
@@ -324,14 +403,16 @@ var _ = {
 	 * @param {string} language The language id.
 	 */
 	highlight: function (text, grammar, language) {
+		var runHook = _.hooks.run;
+
 		var env = {
 			code: text,
 			grammar: grammar,
 			language: language
 		};
-		_.hooks.run('before-tokenize', env);
+		runHook('before-tokenize', env);
 		env.tokens = _.tokenize(env.code, env.grammar);
-		_.hooks.run('after-tokenize', env);
+		runHook('after-tokenize', env);
 		return Token.stringify(_.util.encode(env.tokens), env.language);
 	},
 
@@ -347,8 +428,6 @@ var _ = {
 	 * @param {string} [target]
 	 */
 	matchGrammar: function (text, strarr, grammar, index, startPos, oneshot, target) {
-		var Token = _.Token;
-
 		for (var token in grammar) {
 			if (!grammar.hasOwnProperty(token) || !grammar[token]) {
 				continue;
@@ -503,8 +582,17 @@ var _ = {
 	},
 
 	hooks: {
+		/**
+		 * A map from the name a hook to its respective list of callbacks.
+		 * @type {Object.<string, ((env: Environment) => void)[]=>}
+		 */
 		all: {},
 
+		/**
+		 * Adds a given callback to the list of callbacks for the given hook.
+		 * @param {string} name The name of the hook.
+		 * @param {(env: Environment) => void} callback
+		 */
 		add: function (name, callback) {
 			var hooks = _.hooks.all;
 
@@ -513,6 +601,11 @@ var _ = {
 			hooks[name].push(callback);
 		},
 
+		/**
+		 * Calls all callback for the given hook. Callbacks are called in the order they were added.
+		 * @param {string} name The name of the hook.
+		 * @param {Environment} env The environment given to the callbacks.
+		 */
 		run: function (name, env) {
 			var callbacks = _.hooks.all[name];
 
@@ -528,7 +621,17 @@ var _ = {
 };
 _self.Prism = _;
 
-var Token = _.Token = function(type, content, alias, matchedStr, greedy) {
+/**
+ *
+ * @class
+ * @alias Token
+ * @param {string} type
+ * @param {string} content
+ * @param {string|string[]} [alias]
+ * @param {string} [matchedStr=""]
+ * @param {boolean} [greedy=false]
+ */
+var Token = function(type, content, alias, matchedStr, greedy) {
 	this.type = type;
 	this.content = content;
 	this.alias = alias;
@@ -536,9 +639,16 @@ var Token = _.Token = function(type, content, alias, matchedStr, greedy) {
 	this.length = (matchedStr || "").length|0;
 	this.greedy = !!greedy;
 };
+_.Token = Token;
 
+/**
+ *
+ * @param {string|Token|(string|Token)[]} o
+ * @param {string} language The language id.
+ * @param {Token|(string|Token)[]} [parent]
+ */
 Token.stringify = function(o, language, parent) {
-	if (typeof o == 'string') {
+	if (typeof o === 'string') {
 		return o;
 	}
 
@@ -570,7 +680,6 @@ Token.stringify = function(o, language, parent) {
 	}).join(' ');
 
 	return '<' + env.tag + ' class="' + env.classes.join(' ') + '"' + (attributes ? ' ' + attributes : '') + '>' + env.content + '</' + env.tag + '>';
-
 };
 
 if (!_self.document) {
@@ -604,14 +713,13 @@ if (script) {
 	_.filename = script.src;
 
 	if (!_.manual && !script.hasAttribute('data-manual')) {
-		if(document.readyState !== "loading") {
+		if (document.readyState !== "loading") {
 			if (window.requestAnimationFrame) {
 				window.requestAnimationFrame(_.highlightAll);
 			} else {
 				window.setTimeout(_.highlightAll, 16);
 			}
-		}
-		else {
+		} else {
 			document.addEventListener('DOMContentLoaded', _.highlightAll);
 		}
 	}
