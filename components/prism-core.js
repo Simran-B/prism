@@ -7,6 +7,18 @@ var _self = (typeof window !== 'undefined')
 	);
 
 /**
+ * Prism: Lightweight, robust, elegant syntax highlighting
+ * MIT license http://www.opensource.org/licenses/mit-license.php/
+ * @author Lea Verou http://lea.verou.me
+ */
+
+var Prism = (function(){
+
+// Private helper vars
+var lang = /\blang(?:uage)?-([\w-]+)\b/i;
+var uniqueId = 0;
+
+/**
  * @typedef PatternObject
  * @type {Object}
  * @property {RegExp} pattern
@@ -29,28 +41,11 @@ var _self = (typeof window !== 'undefined')
  * @property {Element[]} [elements]
  * @property {string} selector
  *
- * @typedef {Object} BeforeSanityCheckEnvironment
- * @property {string} code
- * @property {HTMLElement} element
- * @property {Grammar} [grammar]
- * @property {string} language
- *
- * @typedef {Object} BeforeHighlightEnvironment
- * @property {string} code
- * @property {HTMLElement} element
- * @property {Grammar} [grammar]
- * @property {string} language
- *
- * @typedef {Object} BeforeTokenizeEnvironment
+ * @typedef {Object} TokenizeEnvironment
  * @property {string} code
  * @property {Grammar} grammar
  * @property {string} language
- *
- * @typedef {Object} AfterTokenizeEnvironment
- * @property {string} code
- * @property {Grammar} grammar
- * @property {string} language
- * @property {(string|Token)[]} tokens
+ * @property {(string|Token)[]} [tokens]
  *
  * @typedef {Object} WrapEnvironment
  * @property {{[name: string]: string}} attributes
@@ -61,52 +56,32 @@ var _self = (typeof window !== 'undefined')
  * @property {string} tag
  * @property {string} type
  *
- * @typedef {Object} BeforeInsertEnvironment
- * @property {string} code
- * @property {HTMLElement} element
- * @property {Grammar} grammar
- * @property {string} highlightedCode
- * @property {string} language
- *
- * @typedef {Object} AfterHighlightEnvironment
+ * @typedef {Object} HighlightEnvironment
  * @property {string} code
  * @property {HTMLElement} element
  * @property {Grammar} [grammar]
  * @property {string} [highlightedCode]
  * @property {string} language
  *
- * @typedef {Object} CompleteEnvironment
- * @property {string} code
- * @property {HTMLElement} element
- * @property {Grammar} [grammar]
- * @property {string} [highlightedCode]
- * @property {string} language
- *
- * @typedef {BeforeHighlightAllEnvironment|BeforeSanityCheckEnvironment|BeforeHighlightEnvironment|BeforeTokenizeEnvironment|AfterTokenizeEnvironment|WrapEnvironment|BeforeInsertEnvironment|AfterHighlightEnvironment|CompleteEnvironment} Environment
+ * @typedef {BeforeHighlightAllEnvironment|TokenizeEnvironment|WrapEnvironment|HighlightEnvironment} Environment
  *
  */
-
-/**
- * Prism: Lightweight, robust, elegant syntax highlighting
- * MIT license http://www.opensource.org/licenses/mit-license.php/
- * @author Lea Verou http://lea.verou.me
- */
-
-var Prism = (function(){
-
-// Private helper vars
-var lang = /\blang(?:uage)?-([\w-]+)\b/i;
-var uniqueId = 0;
 
 var _ = {
 	manual: _self.Prism && _self.Prism.manual,
 	disableWorkerMessageHandler: _self.Prism && _self.Prism.disableWorkerMessageHandler,
 	util: {
-		encode: function (tokens) {
+
+		/**
+		 * Returns a copy of the given token stream encoded.
+		 * @param {string|Token|(string|Token)[]} tokens The tokens to be encoded.
+		 * @returns {string|Token|(string|Token)[]} The encoded tokens.
+		 */
+		encode: function encode(tokens) {
 			if (tokens instanceof Token) {
-				return new Token(tokens.type, _.util.encode(tokens.content), tokens.alias);
+				return new Token(tokens.type, encode(tokens.content), tokens.alias);
 			} else if (_.util.type(tokens) === 'Array') {
-				return tokens.map(_.util.encode);
+				return tokens.map(encode);
 			} else {
 				return tokens.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\u00a0/g, ' ');
 			}
@@ -133,8 +108,12 @@ var _ = {
 			return obj['__id'];
 		},
 
-		// Deep clone a language definition (e.g. to extend it)
-		clone: function (o, visited) {
+		/**
+		 * Creates a deep clone of the given object. (e.g. to extend language definitions)
+		 * @param {Object} o The object to be cloned.
+		 * @returns {Object} A deep clone of the original.
+		 */
+		clone: function deepClone(o, visited) {
 			var type = _.util.type(o),
 			    objId = _.util.objId;
 
@@ -150,7 +129,7 @@ var _ = {
 
 					for (var key in o) {
 						if (o.hasOwnProperty(key)) {
-							clone[key] = _.util.clone(o[key], visited);
+							clone[key] = deepClone(o[key], visited);
 						}
 					}
 
@@ -164,7 +143,7 @@ var _ = {
 					visited[objId(o)] = clone;
 
 					o.forEach(function (v, i) {
-						clone[i] = _.util.clone(v, visited);
+						clone[i] = deepClone(v, visited);
 					});
 
 					return clone;
@@ -193,14 +172,17 @@ var _ = {
 		},
 
 		/**
-		 * Insert a token before another token in a language literal
-		 * As this needs to recreate the object (we cannot actually insert before keys in object literals),
-		 * we cannot just provide an object, we need an object and a key.
-		 * @param {string} inside The key (or language id) of the parent
-		 * @param {string} before The key to insert before. If not provided, the function appends instead.
-		 * @param {Grammar} insert Object with the key/value pairs to insert
-		 * @param {Object<string, Grammar>} [root=Prism.languages] The object that contains `inside`. If equal to Prism.languages, it can be omitted.
-		 * @returns {Grammar}
+		 * @todo Replace the "if not provided" notice.
+		 *
+		 * Inserts the tokens of `insert` before the token `before` in the grammar `inside` which is a value of `root`.
+		 *
+		 * This operation will create a copy of the `inside` grammar to insert the tokens.
+		 * All occurrences of the old `inside` grammar in `Prism.languages` will be replaced with the new copy.
+		 * @param {string} inside The key of `root` or language id.
+		 * @param {string} before The key before which `insert` will be inserted. If not provided, the function appends instead.
+		 * @param {Grammar} insert The grammar which tokens will be inserted before `before`.
+		 * @param {Object<string, Grammar>} [root=Prism.languages] The object containing `inside`. If equal to Prism.languages, it can be omitted.
+		 * @returns {Grammar} The copy of the `inside` grammar with the tokens inserted.
 		 */
 		insertBefore: function (inside, before, insert, root) {
 			root = root || _.languages;
@@ -221,13 +203,10 @@ var _ = {
 			var ret = {};
 
 			for (var token in grammar) {
-
 				if (grammar.hasOwnProperty(token)) {
 
 					if (token == before) {
-
 						for (var newToken in insert) {
-
 							if (insert.hasOwnProperty(newToken)) {
 								ret[newToken] = insert[newToken];
 							}
@@ -288,9 +267,6 @@ var _ = {
 	 * @param {Function} [callback]
 	 */
 	highlightAllUnder: function(container, async, callback) {
-		/**
-		 * @type {BeforeHighlightAllEnvironment}
-		 */
 		var env = {
 			callback: callback,
 			selector: 'code[class*="language-"], [class*="language-"] code, code[class*="lang-"], [class*="lang-"] code'
@@ -584,7 +560,7 @@ var _ = {
 	hooks: {
 		/**
 		 * A map from the name a hook to its respective list of callbacks.
-		 * @type {Object.<string, ((env: Environment) => void)[]=>}
+		 * @type {{[hookName: string]: Array.<(env: Environment) => void>}}
 		 */
 		all: {},
 
@@ -631,7 +607,7 @@ _self.Prism = _;
  * @param {string} [matchedStr=""]
  * @param {boolean} [greedy=false]
  */
-var Token = function(type, content, alias, matchedStr, greedy) {
+var Token = function (type, content, alias, matchedStr, greedy) {
 	this.type = type;
 	this.content = content;
 	this.alias = alias;
@@ -647,7 +623,7 @@ _.Token = Token;
  * @param {string} language The language id.
  * @param {Token|(string|Token)[]} [parent]
  */
-Token.stringify = function(o, language, parent) {
+Token.stringify = function (o, language, parent) {
 	if (typeof o === 'string') {
 		return o;
 	}
@@ -675,7 +651,7 @@ Token.stringify = function(o, language, parent) {
 
 	_.hooks.run('wrap', env);
 
-	var attributes = Object.keys(env.attributes).map(function(name) {
+	var attributes = Object.keys(env.attributes).map(function (name) {
 		return name + '="' + (env.attributes[name] || '').replace(/"/g, '&quot;') + '"';
 	}).join(' ');
 
