@@ -3,9 +3,9 @@
 
 (function (components) {
 
-	// ./prop1/prop2/prop3/
-
 	var paths = {
+
+		// ./prop1/prop2/prop3/
 
 		/**
 		 * Removes leading and trailing slashes `/` from the given string.
@@ -41,7 +41,10 @@
 		},
 
 		/**
-		 * Simplifies the given path, adding the given base path and removing any unnecessary information.
+		 * - Removes leading slashes and adds a trailing slash if `path` did not end with one.
+		 * - `base` and `path` will be concatenated.
+		 * - All properties before the last `.` property will be removed.
+		 * - If the resulting full path is empty, an empty string will be returned.
 		 * @param {string} path the path to be simplified.
 		 * @param {string} [base=''] the base path of `path`.
 		 * @returns {string}
@@ -70,11 +73,20 @@
 			return parts.join('/') + '/';
 		},
 
+		/**
+		 * This is equivalent to `simplify(path, './')`.
+		 * @param {string} path the path to be normalized.
+		 * @returns {string}
+		 */
+		normalize: function normalize(path) {
+			return paths.simplify(path, './');
+		},
+
 
 		/**
 		 * @param {string} path
 		 * @param {string} [base='']
-		 * @param {Object} [root=components]
+		 * @param {Object.<string, any>} [root=components]
 		 * @returns {any}
 		 */
 		getItem: function getItem(path, base, root) {
@@ -100,7 +112,7 @@
 			}
 
 			return current;
-		}
+		},
 
 	};
 
@@ -118,8 +130,16 @@
 			return [o];
 	}
 
-
+	/**
+	 * A map from any path or alias path to the original path.
+	 * @type {Object.<string, string>}
+	 */
 	var aliasMap = null;
+
+	/**
+	 * Returns a map of all paths and alias paths to their respective original path.
+	 * @returns {Object.<string, string>} the alias map.
+	 */
 	function createAliasMap() {
 		var map = {};
 
@@ -162,11 +182,17 @@
 		return map;
 	}
 
+	/**
+	 * Resolves the given path or alias path returning the original path.
+	 * @param {string} path the path which may as well be an alias path. `path` will be normalized before being used.
+	 * @returns {string} the path itself or the proxied path of the given alias path.
+	 * The returned path is guaranteed to be normalized.
+	 */
 	function resolveAlias(path) {
 		if (!aliasMap)
 			aliasMap = createAliasMap();
 
-		var cleanPath = paths.simplify(path, './');
+		var cleanPath = paths.normalize(path);
 
 		if (!(cleanPath in aliasMap))
 			throw new Error('The given path "' + path + '" is not present in the alias map.');
@@ -175,31 +201,42 @@
 	}
 
 	/**
-	 * Returns all aliases of a given item.
-	 *
+	 * Returns all alias paths of a given item.
 	 * @param {string} path the path for which all aliases are to be returned.
 	 * @param {boolean} [includeSelf=false] whether the path itself will be included in the list of aliases.
-	 * @returns {string[]} the list of aliases.
+	 * @returns {string[]} the list of alias paths. (This may or may not include the given path as well.)
+	 * The returned paths are guaranteed to be normalized.
 	 */
 	function getAliases(path, includeSelf) {
 		var cleanPath = resolveAlias(path);
 
-		// TODO: O(n)? rly?
+		// TODO: make it better than O(n)
 		var aliases = [];
 
 		for (var alias in aliasMap)
-			if (aliasMap[alias] === cleanPath) {
-				if (!includeSelf && alias === cleanPath)
-					continue;
+			if (aliasMap[alias] === cleanPath && (includeSelf || alias !== cleanPath)) {
 				aliases.push(alias);
 			}
 
 		return aliases;
 	}
 
+
+	/**
+	 * A map of paths to their respective titles.
+	 * @type {Object.<string, string>}
+	 */
 	var titleCache = null;
+
+	/**
+	 * Returns the title of the item behind a given path.
+	 * 
+	 * If the given path is an alias and has an alias title, the alias' title is returned.
+	 * @param {string} path the path of alias path. `path` will be normalized before being used.
+	 * @returns {string} the title of the given path.
+	 */
 	function getTitle(path) {
-		var cleanPath = paths.simplify(path, './');
+		var cleanPath = paths.normalize(path);
 
 		if (!titleCache)
 			titleCache = {};
@@ -208,95 +245,268 @@
 
 		var title;
 
-		// TODO: add implementation
-
 		var resolvedPath = resolveAlias(cleanPath);
+		var resolvedItem = paths.getItem(resolvedPath);
 
-		if (cleanPath === resolvedPath) {
-			// TODO:
+		// it is assumed that every resolved item is either a string or has a title property (which has to be a string).
+
+		if (typeof resolvedItem !== 'object') {
+			title = resolvedItem;
+		} else if (resolvedPath === cleanPath || !resolvedItem['aliasTitles']) {
+			title = resolvedItem.title;
+		} else {
+			var aliasTitles = resolvedItem['aliasTitles'];
+			var resolvedBase = paths.getBase(resolvedPath);
+
+			for (var alias in aliasTitles) {
+				if (aliasTitles.hasOwnProperty(alias)) {
+					const aliasTitle = aliasTitles[alias];
+
+					if (paths.simplify(alias, resolvedBase) === cleanPath) {
+						title = aliasTitle;
+						break;
+					}
+				}
+			}
 		}
 
 		return titleCache[cleanPath] = title;
 	}
 
 
-	var dependencyCache = null;
+	var flatDependencyCache = null;
+	var recursiveDependencyCache = null;
 
 	/**
-	 * @param {string} itemPath
-	 * @param {string|string[]} [properties='require']
-	 * @param {boolean} [recursive=true]
-	 * @returns {string[]}
+	 * Returns the correct cache for the given cache key and recursiveness.
+	 * @param {string} cacheKey
+	 * @param {boolean} recursive
+	 * @returns {Object.<string, Object.<string, true>>}
+	 */
+	function getDependencyCache(cacheKey, recursive) {
+		if (!flatDependencyCache)
+			flatDependencyCache = {};
+		if (!recursiveDependencyCache)
+			recursiveDependencyCache = {};
+
+		var dependenciesCache = recursive ? recursiveDependencyCache : flatDependencyCache;
+
+		var cache = dependenciesCache[cacheKey];
+		if (!cache)
+			dependenciesCache[cacheKey] = cache = {};
+		return cache;
+	}
+
+	function prepareProperties(properties) {
+		if (!properties)
+			throw new TypeError('properties has to be defined.');
+		if (properties.cacheKey) // already prepared
+			return properties;
+
+		// make properties an array and create a cache key from that
+		// the cache key is used to get the correct dependency cache based of the properties regarded as dependencies
+		var cacheKey;
+		if (typeof properties === 'string') {
+			properties = [cacheKey = properties];
+		} else if (typeof properties === 'object') {
+			if (!properties.length)
+				throw new Error('properties has to have a length greater than 0.');
+			cacheKey = properties.join(';');
+		} else {
+			throw new Error('properties has to be a string or string array.');
+		}
+
+		properties.cacheKey = cacheKey;
+		return properties;
+	}
+
+	function cacheDependencies(itemPath, properties, recursive) {
+		properties = prepareProperties(properties);
+
+		// get cache
+		var cache = getDependencyCache(properties.cacheKey, recursive);
+
+		/**
+		 * Checks for circular dependencies in the given stack regarding `dependency`.
+		 * @param {string[]} stack the stack of dependencies (normalized).
+		 * @param {string} dependency the dependency (normalized) for which circular references are to be checked.
+		 * @throws {Error} if there is a circular dependency.
+		 */
+		function checkCircular(stack, dependency) {
+			var index = stack.indexOf(dependency);
+			if (index >= 0) {
+				var circle = stack.slice(index);
+				circle.push(dependency);
+				throw new Error('Circular dependencies "' + circle.join('" -> "') + '" for the properties [' + properties.join(', ') + '].');
+			}
+		}
+
+		/**
+		 *
+		 * @param {string} path `path` is required to be normalized.
+		 * @param {string[]} stack the stack of already visited dependencies. All path are normalized.
+		 * @returns {Object.<string, true>}
+		 */
+		function getDependenciesImpl(path, stack) {
+			// path guaranteed to be normalized and not an alias
+			if (path in cache)
+				return cache[path];
+
+			var item = paths.getItem(path);
+			var dependencies = {};
+
+			// we need to have an object
+			if (typeof item === 'object') {
+				if (!stack)
+					stack = [];
+				stack.push(path);
+
+				var base = paths.getBase(path);
+
+				properties.forEach(function (property) {
+					toArray(item[property]).forEach(function (dependency) {
+						var depPath = resolveAlias(paths.simplify(dependency, base));
+
+						// check for circular dependencies and add
+						checkCircular(stack, depPath);
+						dependencies[depPath] = true;
+
+						if (recursive) {
+							var recursiveDependencies = getDependenciesImpl(depPath, stack);
+
+							for (var recDepPath in recursiveDependencies) {
+								// check for circular dependencies and add
+								checkCircular(stack, recDepPath);
+								dependencies[recDepPath] = true;
+							}
+						}
+					});
+				});
+
+				stack.pop();
+			}
+
+			cache[path] = dependencies;
+			return dependencies;
+		}
+
+		// resolve item path
+		var resolvedPath = resolveAlias(itemPath);
+
+		// cache dependencies
+		var dependencies = getDependenciesImpl(resolvedPath);
+
+		return { cache: cache, path: resolvedPath, dependencies: dependencies };
+	}
+
+	/**
+	 * Returns an array of all dependencies of a given item.
+	 * 
+	 * Dependencies are paths contained by at least one of the given properties.
+	 * The paths can be given as an array or as a simple string.
+	 * These paths do **not** have to be normalized and can be aliases.
+	 * The base path of the parent item will be used to normalize each path.
+	 * @param {string} itemPath the path of the item for which the list of dependencies is to be returned.
+	 * `itemPath` is **not** required to be normalized and can be an alias.
+	 * @param {string|string[]} properties
+	 * @param {boolean} [recursive=true] whether dependencies are to be resolved recursively.
+	 * @returns {string[]} a copy of the list of aliases of the item of `itemPath`.
+	 * - All dependency paths are guaranteed to be normalized and **not** to be aliases.
+	 * - The list is guaranteed to not contain any duplicates.
+	 * - Dependencies can be in any order.
+	 * @throws {Error} if circular dependencies were detected. (Only if `recursive` is `true`.)
 	 */
 	function getDependencies(itemPath, properties, recursive) {
 		if (recursive === undefined)
 			recursive = true;
+		if (typeof recursive !== 'boolean')
+			throw new Error('recursive has to be a boolean.');
 
-		// make properties and array and create cache key
-		var cacheKey;
-		if (properties) {
-			if (typeof properties === 'string') {
-				cacheKey = properties;
-				properties = [properties];
-			} else {
-				cacheKey = properties.join(';');
-			}
-		} else {
-			properties = [cacheKey = 'require'];
-		}
+		// copy the array because cacheDependencies is going to modify it
+		if (typeof properties === 'object')
+			properties = properties.slice(0);
 
-		// simplify path
-		itemPath = paths.simplify(itemPath, './');
+		var cached = cacheDependencies(itemPath, properties, recursive);
 
-		// try cache
-		if (!dependencyCache)
-			dependencyCache = {};
-		if (!dependencyCache[cacheKey])
-			dependencyCache[cacheKey] = {};
-		else if (dependencyCache[cacheKey][itemPath])
-			return Object.keys(dependencyCache[cacheKey][itemPath]);
-
-
-		var dependencies = {};
-
-		var base = paths.getBase(itemPath);
-		var item = paths.getItem(itemPath);
-
-		properties.forEach(function (property) {
-			toArray(item[property]).forEach(function (dep) {
-				dep = paths.simplify(dep, base);
-
-				if (!(dep in dependencies)) {
-					dependencies[dep] = true;
-					if (recursive) {
-						getDependencies(dep, properties, true).forEach(function (recursiveDep) {
-							dependencies[recursiveDep] = true;
-						});
-					}
-				}
-			});
-		});
-
-		dependencyCache[cacheKey][itemPath] = dependencies;
-
-		return Object.keys(dependencies);
+		return Object.keys(cached.dependencies);
 	}
 
-	function hasDependency(itemPath, dependencyPath, properties) {
-		// TODO:
+	function hasDependency(itemPath, dependencyPath, properties, recursive) {
+		if (recursive === undefined)
+			recursive = true;
+		if (typeof recursive !== 'boolean')
+			throw new Error('recursive has to be a boolean.');
+
+		// copy the array because cacheDependencies is going to modify it
+		if (typeof properties === 'object')
+			properties = properties.slice(0);
+
+		var cached = cacheDependencies(itemPath, properties, recursive);
+
+		var resolvedDepPath = resolveAlias(dependencyPath);
+
+		return resolvedDepPath in cached.dependencies;
 	}
 
 	/**
-	 * Sorts the given list of item path by thier relationship described in `require`, `peerDependencies` and `after`.
 	 *
-	 * The sorting algorithm is guaranteed to be stable.
-	 * @param {string[]} itemPaths
-	 * @param {string} [base='']
-	 * @param {string[]}
+	 *
+	 * @param {string|string[]} properties
+	 * @param {boolean} [recursive=true] whether dependencies are to be resolved recursively.
+	 * @returns {(a: string, b: string) => number} A comparer comparing 2 paths by their dependency to each other.
+	 * If a depends on b, then b will be regarded as less than a.
 	 */
-	function sortItems(itemPaths, base) {
-		// TODO: add implementation
+	function byDependencies(properties, recursive) {
+		if (recursive === undefined)
+			recursive = true;
+		if (typeof recursive !== 'boolean')
+			throw new Error('recursive has to be a boolean.');
+
+		// because cacheDependencies tries to reuse the properties array, we will use that to create an array only once
+		if (typeof properties === 'string')
+			properties = [properties];
+
+		// copy the array because cacheDependencies is going to modify it
+		else if (typeof properties === 'object')
+			properties = properties.slice(0);
+
+		return function (a, b) {
+			var cachedA = cacheDependencies(a, properties, recursive);
+			var cachedB = cacheDependencies(b, properties, recursive);
+
+			// a depends on b
+			if (cachedB.path in cachedA.dependencies)
+				return 1;
+			// b depends on a
+			if (cachedA.path in cachedB.dependencies)
+				return -1;
+			// independent
+			return 0;
+		};
 	}
+
+
+
+	Object.defineProperties(components, {
+		'resolveAlias': {
+			value: resolveAlias,
+		},
+		'getAliases': {
+			value: getAliases,
+		},
+		'getTitle': {
+			value: getTitle,
+		},
+		'getDependencies': {
+			value: getDependencies,
+		},
+		'hasDependency': {
+			value: hasDependency,
+		},
+		'byDependencies': {
+			value: byDependencies,
+		},
+	});
 
 }(components));
 
