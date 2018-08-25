@@ -1,4 +1,4 @@
-var gulp   = require('gulp'),
+var gulp = require('gulp'),
 	rename = require('gulp-rename'),
 	uglify = require('gulp-uglify'),
 	header = require('gulp-header'),
@@ -6,23 +6,26 @@ var gulp   = require('gulp'),
 	replace = require('gulp-replace'),
 	fs = require('fs'),
 
-	paths  = {
-		componentsFile: 'components.json',
-		componentsFileJS: 'components.js',
-		components: ['components/**/*.js', '!components/index.js', '!components/**/*.min.js'],
-		main: [
-			'components/prism-core.js',
-			'components/prism-markup.js',
-			'components/prism-css.js',
-			'components/prism-clike.js',
-			'components/prism-javascript.js',
-			'plugins/file-highlight/prism-file-highlight.js'
-		],
-		plugins: ['plugins/**/*.js', '!plugins/**/*.min.js'],
-		showLanguagePlugin: 'plugins/show-language/prism-show-language.js',
-		autoloaderPlugin: 'plugins/autoloader/prism-autoloader.js',
-		changelog: 'CHANGELOG.md'
-	},
+	fold = require('./gulpfiles/fold');
+unfold = require('./gulpfiles/unfold');
+
+paths = {
+	componentsFile: 'components.json',
+	componentsFileJS: 'components.js',
+	components: ['components/**/*.js', '!components/index.js', '!components/**/*.min.js'],
+	main: [
+		'components/prism-core.js',
+		'components/prism-markup.js',
+		'components/prism-css.js',
+		'components/prism-clike.js',
+		'components/prism-javascript.js',
+		'plugins/file-highlight/prism-file-highlight.js'
+	],
+	plugins: ['plugins/**/*.js', '!plugins/**/*.min.js'],
+	showLanguagePlugin: 'plugins/show-language/prism-show-language.js',
+	autoloaderPlugin: 'plugins/autoloader/prism-autoloader.js',
+	changelog: 'CHANGELOG.md'
+},
 
 	componentsPromise = new Promise(function (resolve, reject) {
 		fs.readFile(paths.componentsFile, {
@@ -36,14 +39,51 @@ var gulp   = require('gulp'),
 		});
 	});
 
-gulp.task('components', function() {
+function compressKeywords() {
+	if (compressKeywords.pattern) {
+		var wordListBase = /\(\?\:(?:inner|[\w?])+\)/.source
+
+		var wordList = wordListBase.replace('inner|', '');
+		for (var i = 0; i < 5; i++) {
+			wordList = wordListBase.replace('inner', wordList);
+		}
+
+		var pattern = /(\\b)(wordList)(\\b)/.source.replace('wordList', wordList);
+
+		compressKeywords.pattern = RegExp(pattern, 'g');
+	}
+
+	return replace(compressKeywords.pattern, function (m) {
+		// search for 3 groups representing prefix, word list, suffix.
+		for (var i = arguments.length - 1; i >= 3; i++) {
+			var prefix = arguments[i - 2];
+			var wordList = arguments[i - 1];
+			var suffix = arguments[i];
+
+			if (typeof prefix !== 'string' || typeof wordList !== 'string' || typeof suffix !== 'string')
+				continue;
+
+			var folded = fold(unfold(wordList));
+
+			if (wordList <= folded)
+				folded = wordList;
+
+			return prefix + folded + suffix;
+		}
+
+		throw new Error('Could not find prefix, word list, and suffix.');
+	});
+};
+
+gulp.task('components', function () {
 	return gulp.src(paths.components)
+		.pipe(compressKeywords())
 		.pipe(uglify())
 		.pipe(rename({ suffix: '.min' }))
 		.pipe(gulp.dest('components'));
 });
 
-gulp.task('build', function() {
+gulp.task('build', function () {
 	return gulp.src(paths.main)
 		.pipe(header('\n/* **********************************************\n' +
 			'     Begin <%= file.relative %>\n' +
@@ -52,8 +92,9 @@ gulp.task('build', function() {
 		.pipe(gulp.dest('./'));
 });
 
-gulp.task('plugins', ['languages-plugins'], function() {
+gulp.task('plugins', ['languages-plugins'], function () {
 	return gulp.src(paths.plugins)
+		.pipe(compressKeywords())
 		.pipe(uglify())
 		.pipe(rename({ suffix: '.min' }))
 		.pipe(gulp.dest('plugins'));
@@ -67,7 +108,7 @@ gulp.task('components-json', function (cb) {
 	});
 });
 
-gulp.task('watch', function() {
+gulp.task('watch', function () {
 	gulp.watch(paths.components, ['components', 'build']);
 	gulp.watch(paths.plugins, ['plugins', 'build']);
 });
@@ -88,7 +129,7 @@ gulp.task('languages-plugins', function (cb) {
 					languagesMap[name] = data.languages[p].aliasTitles[name];
 				}
 
-				if(data.languages[p].require) {
+				if (data.languages[p].require) {
 					dependenciesMap[p] = data.languages[p].require;
 				}
 			}
@@ -98,20 +139,20 @@ gulp.task('languages-plugins', function (cb) {
 		var jsonDependenciesMap = JSON.stringify(dependenciesMap);
 
 		var tasks = [
-			{plugin: paths.showLanguagePlugin, map: jsonLanguagesMap},
-			{plugin: paths.autoloaderPlugin, map: jsonDependenciesMap}
+			{ plugin: paths.showLanguagePlugin, map: jsonLanguagesMap },
+			{ plugin: paths.autoloaderPlugin, map: jsonDependenciesMap }
 		];
 
 		var cpt = 0;
 		var l = tasks.length;
-		var done = function() {
+		var done = function () {
 			cpt++;
-			if(cpt === l) {
+			if (cpt === l) {
 				cb && cb();
 			}
 		};
 
-		tasks.forEach(function(task) {
+		tasks.forEach(function (task) {
 			var stream = gulp.src(task.plugin)
 				.pipe(replace(
 					/\/\*languages_placeholder\[\*\/[\s\S]*?\/\*\]\*\//,

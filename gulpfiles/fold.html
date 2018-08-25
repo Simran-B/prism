@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Unfold test</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<script src="unfold.js"></script>
+	<script src="prefix-tree.js"></script>
+	<script src="fold.js"></script>
+	<style>
+		pre, textarea {
+			box-sizing: border-box;
+			display: block;
+			font-family: monospace;
+			white-space: pre-wrap;
+			width: 100%;
+			min-width: 100%;
+			max-width: 100%;
+		}
+	</style>
+</head>
+<body>
+	<textarea id="text"></textarea>
+	<pre id="stats"></pre>
+	<pre id="fold-output"></pre>
+	<pre id="unfold-output"></pre>
+	<script>
+		var text = document.querySelector('#text');
+		var stats = document.querySelector('#stats');
+		var foldOutput = document.querySelector('#fold-output');
+		var unfoldOutput = document.querySelector('#unfold-output');
+
+		var timer;
+
+		text.onkeyup = function () {
+			clearTimeout(timer);
+			timer = setTimeout(function () {
+				try {
+					var words = text.value;
+					var words = unfold(text.value);
+					unfoldOutput.innerText = words.join('\n');
+
+					var folded = fold(words);
+					foldOutput.innerHTML = folded;
+				} catch (e) {
+					unfoldOutput.innerText = e.message;
+				}
+			}, 100);
+		}
+	</script>
+</body>
+</html>

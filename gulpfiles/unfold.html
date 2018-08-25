@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Unfold test</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<script src="unfold.js"></script>
+	<style>
+		pre,
+		textarea {
+			box-sizing: border-box;
+			display: block;
+			font-family: monospace;
+			white-space: pre-wrap;
+			width: 100%;
+			min-width: 100%;
+			max-width: 100%;
+		}
+		textarea {
+			height: 10em;
+		}
+	</style>
+</head>
+
+<body>
+	<textarea id="text"></textarea>
+	<pre id="unfold-output"></pre>
+
+	<script>
+		var text = document.querySelector('#text');
+		var unfoldOutput = document.querySelector('#unfold-output');
+
+		var timer;
+
+		text.onkeyup = function () {
+			clearTimeout(timer);
+			timer = setTimeout(function () {
+				try {
+					unfoldOutput.innerText = unfold(text.value).join('\n');
+				} catch (e) {
+					unfoldOutput.innerText = e.message;
+				}
+			}, 100);
+		}
+	</script>
+</body>
+
+</html>
