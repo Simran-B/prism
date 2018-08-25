@@ -1,3 +1,4 @@
+
 // TODO: Merge this file with `components.js`
 // TODO: Documentation
 
@@ -94,7 +95,7 @@
 				root = components;
 
 			var cleanPath = paths.simplify(path, base);
-			if (cleanPath)
+			if (!cleanPath)
 				return root;
 
 			var parts = paths.trimSlash(cleanPath).split('/');
@@ -134,7 +135,7 @@
 	 * A map from any path or alias path to the original path.
 	 * @type {Object.<string, string>}
 	 */
-	var aliasMap = null;
+	var aliasMap = createAliasMap();
 
 	/**
 	 * Returns a map of all paths and alias paths to their respective original path.
@@ -450,7 +451,6 @@
 
 	/**
 	 *
-	 *
 	 * @param {string|string[]} properties
 	 * @param {boolean} [recursive=true] whether dependencies are to be resolved recursively.
 	 * @returns {(a: string, b: string) => number} A comparer comparing 2 paths by their dependency to each other.
@@ -509,8 +509,6 @@
 	});
 
 }(components));
-
-
 
 if (typeof module !== 'undefined' && module.exports) {
 	module.exports = components;
