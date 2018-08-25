@@ -143,15 +143,17 @@
 	 */
 	function createAliasMap() {
 		var map = {};
+		var fixedPaths = {};
 
 		(function addAliases(root, path) {
+			fixedPaths[path] = true;
+
 			if (typeof root !== 'object')
 				return;
 
-			// each path is its own alias
+			// overshadowing is not allowed
 			if (path in map)
 				throw new Error('The path "' + path + '" is overshadowed by an alias from "' + map[path] + '".');
-			map[path] = path;
 
 			for (var prop in root) {
 				if (root.hasOwnProperty(prop)) {
@@ -165,8 +167,12 @@
 						aliases.forEach(function (alias) {
 							alias = paths.simplify(alias, base);
 
-							if (alias in map)
-								throw new Error('Cannot create alias map because "' + path + '" and "' + map[alias] + '" have the same alias "' + alias + '".');
+							// alias cannot be an existing path
+							if (alias in fixedPaths)
+								throw new Error('Alias "' + alias + '" of "' + path + '" cannot overwrite an existing path.');
+							// same alias for different paths is not allowed
+							if (alias in map && map[alias] !== path)
+								throw new Error('"' + path + '" and "' + map[alias] + '" both have the same alias "' + alias + '".');
 
 							map[alias] = path;
 						});
@@ -184,9 +190,10 @@
 	}
 
 	/**
-	 * Resolves the given path or alias path returning the original path.
-	 * @param {string} path the path which may as well be an alias path. `path` will be normalized before being used.
-	 * @returns {string} the path itself or the proxied path of the given alias path.
+	 * Resolves the given path or alias path returning the proxied path or the given path.
+	 * @param {string} path the path which may as well be an alias path. It does not have to be normalized.
+	 * @returns {string} the path itself (normalized) or the proxied path of the given alias path.
+	 *
 	 * The returned path is guaranteed to be normalized.
 	 */
 	function resolveAlias(path) {
@@ -195,29 +202,31 @@
 
 		var cleanPath = paths.normalize(path);
 
-		if (!(cleanPath in aliasMap))
-			throw new Error('The given path "' + path + '" is not present in the alias map.');
-
-		return aliasMap[cleanPath];
+		var proxiedPath = aliasMap[cleanPath];
+		if (proxiedPath)
+			return proxiedPath;
+		return cleanPath;
 	}
 
 	/**
-	 * Returns all alias paths of a given item.
+	 * Returns all alias paths of the given path.
 	 * @param {string} path the path for which all aliases are to be returned.
-	 * @param {boolean} [includeSelf=false] whether the path itself will be included in the list of aliases.
-	 * @returns {string[]} the list of alias paths. (This may or may not include the given path as well.)
-	 * The returned paths are guaranteed to be normalized.
+	 * @returns {string[]} the list of alias paths and the proxied path itself.
+	 *
+	 * All paths are guaranteed to be normalized.
+	 * The last item is guaranteed to be the proxied path itself.
 	 */
-	function getAliases(path, includeSelf) {
-		var cleanPath = resolveAlias(path);
+	function getAliases(path) {
+		var resolvedPath = resolveAlias(path);
 
-		// TODO: make it better than O(n)
 		var aliases = [];
 
 		for (var alias in aliasMap)
-			if (aliasMap[alias] === cleanPath && (includeSelf || alias !== cleanPath)) {
+			if (aliasMap[alias] === resolvedPath) {
 				aliases.push(alias);
 			}
+
+		aliases.push(resolvedPath);
 
 		return aliases;
 	}
@@ -231,7 +240,7 @@
 
 	/**
 	 * Returns the title of the item behind a given path.
-	 * 
+	 *
 	 * If the given path is an alias and has an alias title, the alias' title is returned.
 	 * @param {string} path the path of alias path. `path` will be normalized before being used.
 	 * @returns {string} the title of the given path.
@@ -402,7 +411,7 @@
 
 	/**
 	 * Returns an array of all dependencies of a given item.
-	 * 
+	 *
 	 * Dependencies are paths contained by at least one of the given properties.
 	 * The paths can be given as an array or as a simple string.
 	 * These paths do **not** have to be normalized and can be aliases.
