@@ -1,3 +1,5 @@
+// @ts-check
+
 class PrefixTree {
 
 	/**
@@ -62,10 +64,10 @@ class PrefixTree {
 	/**
 	 *
 	 * @template T
-	 * @param {(value: PrefixTree, tree?: PrefixTree) => T} [callbackfn=t=>t]
+	 * @param {(value: PrefixTree, tree?: PrefixTree) => T} [callbackfn=(v,t)=>v]
 	 * @return {T[]}
 	 */
-	map(callbackfn = t => t) {
+	map(callbackfn = (v) => v) {
 		const children = [];
 		this.forEach(value => children.push(callbackfn(value, this)));
 		return children;
@@ -184,7 +186,7 @@ class PrefixTree {
 	 * @returns {PrefixTree}
 	 */
 	static intersect(...trees) {
-
+		// TODO:
 	}
 
 }

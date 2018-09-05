@@ -1,7 +1,9 @@
+// @ts-check
 
 /**
  * @typedef Competitor
  * @property {(this: T) => void} qualified
+ * @template T
  */
 
 /**
@@ -10,16 +12,18 @@
 class Competition {
 
 	constructor(maxCount) {
-		/** @type {{competitor: T & Competitor, score: number}[]} */
+		/** @type {{competitor: T & Competitor.<T>, score: number}[]} */
 		this.data = [];
 		this.maxCount = maxCount;
 		this.lowestScore = NaN;
 		this.closed = false;
+		/** @type {T[]} */
+		this.finalists = null;
 	}
 
 	/**
 	 *
-	 * @param {T & Competitor} competitor
+	 * @param {T & Competitor.<T>} competitor
 	 * @param {number} score
 	 * @memberof Competition
 	 */
@@ -34,9 +38,9 @@ class Competition {
 			this.lowestScore = isNaN(this.lowestScore) ? score : Math.min(this.lowestScore, score);
 			this._sort();
 		} else if (score > this.lowestScore) {
+			this.data.pop();
 			this.data.push({ competitor: competitor, score: score });
 			this._sort();
-			this.data.pop();
 			this.lowestScore = this.data[this.data.length - 1].score;
 		}
 	}
@@ -46,7 +50,7 @@ class Competition {
 	 * @memberof Competition
 	 */
 	_sort() {
-		this.data.sort(function (a, b) {
+		this.data.sort((a, b) => {
 			return a.score - b.score;
 		});
 	}
@@ -57,7 +61,11 @@ class Competition {
 	 * @memberof Competition
 	 */
 	close() {
-		return this.data.map(function (c) {
+		if (this.closed)
+			return this.finalists;
+
+		this.closed = true;
+		return this.finalists = this.data.map(c => {
 			c.competitor.qualified();
 			return c.competitor;
 		});

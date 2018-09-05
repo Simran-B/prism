@@ -1,5 +1,9 @@
-//var PrefixTree = require('./prefix-tree');
-//var Competition = require('./competition');
+const PrefixTree = require('./prefix-tree');
+const Competition = require('./competition');
+
+// @ts-check
+
+"use strict";
 
 /**
  *
@@ -15,7 +19,7 @@ function fold(keywords, lookAhead) {
 
 	// check for duplicates
 	(function () {
-		var map = {};
+		const map = {};
 		keywords.forEach(function (w) {
 			if (w in map)
 				throw new Error('Duplicate word "' + w + '".');
@@ -25,7 +29,7 @@ function fold(keywords, lookAhead) {
 
 	// check for invalid characters
 	keywords.forEach(function (w) {
-		var regex = /^[^\\(?:)|[\]]*$/;
+		const regex = /^[^\\(?:)|[\]]*$/;
 		if (!regex.test(w))
 			throw new Error('Invalid characters in "' + w + '". The word must match the expression ' + regex);
 	});
@@ -95,9 +99,9 @@ function optimizeWords(words, options) {
 
 	/**
 	 * The different optimization methods which will be used.
-	 * @type {(words: string[], options: OptimizationOptions) => WordGroupCandidate[]}
+	 * @type {Array.<(words: string[], options: OptimizationOptions) => WordGroupCandidate[]>}
 	 */
-	var methods = [
+	const methods = [
 		optimizationMethods.simpleNoop,
 		optimizationMethods.simplePrefix,
 		optimizationMethods.simpleSuffix,
@@ -107,12 +111,12 @@ function optimizeWords(words, options) {
 	 * The combined list of finalists of each optimization method.
 	 * @type {WordGroupCandidate[]}
 	 */
-	var finalists = [];
-	methods.forEach(function (method) {
+	const finalists = [];
+	methods.forEach(method => {
 		finalists.push(...method(words, options));
 	});
 
-	finalists.sort(function (a, b) { return a.score - b.score; });
+	finalists.sort((a, b) => a.score - b.score);
 
 	return finalists.pop().generator().flattenContent();
 }
@@ -148,9 +152,9 @@ class WordGroup {
 	 * @memberof WordGroup
 	 */
 	toString() {
-		var str = this.printContent();
+		let str = this.printContent();
 
-		var after = this.after;
+		let after = this.after;
 		while (after) {
 			str += this.after.printContent();
 			after = after.after;
@@ -190,7 +194,7 @@ class WordGroup {
 		// combine single characters into a character set: a b c def => [abc] def
 		words.sort((a, b) => b.length - a.length);
 
-		let charCount = words.reduce((count, value) => value.length === 1 ? count + 1 : count, 0);
+		const charCount = words.reduce((count, value) => value.length === 1 ? count + 1 : count, 0);
 		if (charCount === words.length || charCount >= 3) {
 			// this will only decrease the overall length if either:
 			//  a) charCount === words.length
@@ -198,7 +202,7 @@ class WordGroup {
 			//  b) charCount >= 3
 			//     With charCount == 3 and above, "(?:[abc]|words)".length <= "(?:a|b|c|words)" is true.
 
-			var charSet = "[" + words.slice(words.length - charCount, words.length).join("") + "]";
+			const charSet = "[" + words.slice(words.length - charCount, words.length).join("") + "]";
 			words.splice(words.length - charCount, charCount, charSet);
 
 			// single character set: [abc]
@@ -216,9 +220,9 @@ class WordGroup {
 	 * @memberof WordGroup
 	 */
 	get length() {
-		var score = this.scoreContent();
+		let score = this.scoreContent();
 
-		var after = this.after;
+		let after = this.after;
 		while (after) {
 			score += this.after.scoreContent();
 			after = after.after;
@@ -240,10 +244,10 @@ class WordGroup {
 		if (this.content.length === 1)
 			return this.content[0].length;
 
-		var optional = 0;
-		var lengths = [];
+		let optional = 0;
+		const lengths = [];
 		this.content.forEach(function (t) {
-			var l = t ? t.length : 0;
+			const l = t ? t.length : 0;
 			if (l)
 				lengths.push(l);
 			else
@@ -256,7 +260,8 @@ class WordGroup {
 
 		lengths.sort();
 
-		for (var charCount = 0, l = lengths.length; charCount < l; charCount++)
+		let charCount = 0;
+		for (let l = lengths.length; charCount < l; charCount++)
 			if (lengths[charCount] > 1)
 				break;
 		charCount = Math.min(charCount, lengths.length);
@@ -275,10 +280,10 @@ class WordGroup {
 		}
 
 		// join using alternations: (?:abc|def)
-		var sum = optional + 4; // (?:)
-		for (var i = 0, l = lengths.length; i < l; i++)
+		let sum = optional + 4; // (?:)
+		for (let i = 0, l = lengths.length; i < l; i++)
 			sum += lengths[i];
-		sum += l - 1; // |
+		sum += lengths.length - 1; // |
 		return sum;
 	}
 
@@ -317,7 +322,7 @@ class WordGroup {
 }
 
 
-var optimizationMethods = {
+const optimizationMethods = {
 
 	util: {
 		/**
@@ -328,7 +333,7 @@ var optimizationMethods = {
 		 * @param {string[]} words
 		 * @param {OptimizationOptions} options
 		 */
-		optimize: function (words, options) {
+		optimize(words, options) {
 			return optimizeWords(words, options);
 		},
 		/**
@@ -336,8 +341,8 @@ var optimizationMethods = {
 		 * @param {string[]} words
 		 * @param {OptimizationOptions} options
 		 */
-		approximate: function (words, options) {
-			var opts = Object.assign({}, options);
+		approximate(words, options) {
+			const opts = Object.assign({}, options);
 			opts.isLookingAhead = true;
 			return optimizeWords(words, opts);
 		},
@@ -346,7 +351,7 @@ var optimizationMethods = {
 		 * @param {string[]} words
 		 * @param {OptimizationOptions} options
 		 */
-		noopOptimize: function (words, options) {
+		noopOptimize(words, options) {
 			return new WordGroup(words);
 		},
 
@@ -355,7 +360,7 @@ var optimizationMethods = {
 		 * @param {string} string
 		 * @returns {string}
 		 */
-		reverseString: function (string) {
+		reverseString(string) {
 			return Array.from(string).reverse().join("");
 		},
 		/**
@@ -363,8 +368,57 @@ var optimizationMethods = {
 		 * @param {string[]} strings
 		 * @returns {string[]}
 		 */
-		reverseStrings: function (strings) {
-			return strings.map(optimizationMethods.util.reverseString);
+		reverseStrings(strings) {
+			return strings.map(this.reverseString);
+		},
+
+		/**
+		 * Returns the prefix tree of the given words.
+		 *
+		 * It is assumed that both the list of words and the tree are immutable.
+		 * @param {string[]} words
+		 * @returns {PrefixTree}
+		 */
+		getPrefixTree(words) {
+			if (words._prefixTree)
+				return words._prefixTree;
+
+			const tree = words._prefixTree || PrefixTree.create(words);
+			tree.setCaching(true, true);
+			Object.defineProperty(words, '_prefixTree', {
+				value: tree,
+			});
+
+			return tree;
+		},
+		/**
+		 * Returns the suffix tree of the given words.
+		 *
+		 * It is assumed that both the list of words and the tree are immutable.
+		 * @param {string[]} words
+		 * @returns {PrefixTree}
+		 */
+		getSuffixTree(words) {
+			if (words._suffixTree)
+				return words._suffixTree;
+
+			let reversedWords;
+			if (words._reversedWords) {
+				reversedWords = words._reversedWords;
+			} else {
+				reversedWords = this.reverseStrings(words);
+				Object.defineProperty(words, '_reversed', {
+					value: reversedWords,
+				});
+			}
+
+			const tree = PrefixTree.create(reversedWords);
+			tree.setCaching(true, true);
+			Object.defineProperty(words, '_suffixTree', {
+				value: tree,
+			});
+
+			return tree;
 		}
 	},
 
@@ -374,13 +428,13 @@ var optimizationMethods = {
 	 * @param {OptimizationOptions} options
 	 * @returns {WordGroupCandidate[]}
 	 */
-	simpleNoop: function (words, options) {
-		var wordGroup = new WordGroup(words);
+	simpleNoop(words, options) {
+		const wordGroup = new WordGroup(words);
 		return [
 			{
 				consumedWords: words,
 				score: scoreWordGroup(wordGroup),
-				generator: function () {
+				generator() {
 					return wordGroup;
 				}
 			}
@@ -394,28 +448,26 @@ var optimizationMethods = {
 	 * @param {OptimizationOptions} options
 	 * @returns {WordGroupCandidate[]}
 	 */
-	simplePrefix: function (words, options) {
-		var util = optimizationMethods.util;
+	simplePrefix(words, options) {
+		const util = optimizationMethods.util;
 
 		/** @type {Competition.<WordGroupCandidate>} */
-		var competition = new Competition(options.maxCandidates);
+		const competition = new Competition(options.maxCandidates);
 
-		var prefixTree = PrefixTree.create(words);
-		prefixTree.setCaching(true, true);
-
+		const prefixTree = util.getPrefixTree(words);
 
 		/**
 		 * @param {string} prefix
 		 */
 		function chooseBest(prefix) {
-			var child = prefixTree.getChild(prefix);
+			const child = prefixTree.getChild(prefix);
 
 			// single word
 			if (child.count === 1)
 				return;
 
-			var prefixedWords = child.getWords();
-			var remainingWords = prefixTree.getWordsWithoutPrefix(prefix);
+			const prefixedWords = child.getWords();
+			const remainingWords = prefixTree.getWordsWithoutPrefix(prefix);
 
 			/**
 			 * Returns the word group generated from the current prefix optimized using `optimizer`.
@@ -423,13 +475,13 @@ var optimizationMethods = {
 			 * @returns {WordGroup}
 			 */
 			function getWordGroup(optimizer) {
-				var content = [
+				const content = [
 					new WordGroup(prefix, optimizer(prefixedWords, options))
 				];
 
 				if (remainingWords.length) {
 					// optimize
-					var optimized = optimizer(remainingWords, options);
+					const optimized = optimizer(remainingWords, options);
 
 					if (optimized.content === remainingWords && optimized.nothingAfter)
 						// unable to optimize
@@ -443,12 +495,12 @@ var optimizationMethods = {
 
 
 			/** @type {WordGroupCandidate} */
-			var competitor = {
+			const competitor = {
 				consumedWords: null,
 				generator: null,
 				score: -Infinity,
-				qualified: function () {
-					var approximated = getWordGroup(util.approximate);
+				qualified() {
+					const approximated = getWordGroup(util.approximate);
 
 					this.score = scoreWordGroup(approximated);
 					this.generator = function () {
@@ -459,7 +511,7 @@ var optimizationMethods = {
 				},
 			};
 
-			var score = scoreWordGroup(getWordGroup(util.noopOptimize));
+			const score = scoreWordGroup(getWordGroup(util.noopOptimize));
 			competition.compete(competitor, score);
 
 			// try all prefixes
@@ -473,33 +525,31 @@ var optimizationMethods = {
 
 	/**
 	 * - abc_suf, def_suf, ghi_suf => (abc|def|ghi)_suf
-	 * - get, set, let => (g|s|l)et
+	 * - get, set, const => (g|s|l)et
 	 * @param {string[]} words
 	 * @param {OptimizationOptions} options
 	 * @returns {WordGroupCandidate[]}
 	 */
-	simpleSuffix: function (words, options) {
-		var util = optimizationMethods.util;
+	simpleSuffix(words, options) {
+		const util = optimizationMethods.util;
 
 		/** @type {Competition.<WordGroupCandidate>} */
-		var competition = new Competition(options.maxCandidates);
+		const competition = new Competition(options.maxCandidates);
 
-		var suffixTree = PrefixTree.create(util.reverseStrings(words));
-		suffixTree.setCaching(true, true);
-
+		const suffixTree = util.getSuffixTree(words);
 
 		/**
 		 * @param {string} suffix
 		 */
 		function chooseBest(suffix) {
-			var child = suffixTree.getChild(suffix);
+			const child = suffixTree.getChild(suffix);
 
 			// single word
 			if (child.count === 1)
 				return;
 
-			var suffixedWords = child.getWords();
-			var remainingWords = suffixTree.getWordsWithoutPrefix(suffix);
+			const suffixedWords = child.getWords();
+			const remainingWords = suffixTree.getWordsWithoutPrefix(suffix);
 
 			/**
 			 * Returns the word group generated from the current prefix optimized using `optimizer`.
@@ -507,8 +557,8 @@ var optimizationMethods = {
 			 * @returns {WordGroup}
 			 */
 			function getWordGroup(optimizer) {
-				var _suffixedWords = suffixedWords;
-				var _remainingWords = remainingWords;
+				let _suffixedWords = suffixedWords;
+				let _remainingWords = remainingWords;
 
 				// reverse words
 				if (optimizer === util.optimize) {
@@ -516,13 +566,13 @@ var optimizationMethods = {
 					_remainingWords = util.reverseStrings(_remainingWords);
 				}
 
-				var content = [
+				const content = [
 					new WordGroup(optimizer(_suffixedWords, options), new WordGroup(util.reverseString(suffix)))
 				];
 
 				if (remainingWords.length) {
 					// optimize
-					var optimized = optimizer(_remainingWords, options);
+					const optimized = optimizer(_remainingWords, options);
 
 					if (optimized.content === _remainingWords && optimized.nothingAfter)
 						// unable to optimize
@@ -536,12 +586,12 @@ var optimizationMethods = {
 
 
 			/** @type {WordGroupCandidate} */
-			var competitor = {
+			const competitor = {
 				consumedWords: null,
 				generator: null,
 				score: -Infinity,
-				qualified: function () {
-					var approximated = getWordGroup(util.approximate);
+				qualified() {
+					const approximated = getWordGroup(util.approximate);
 
 					this.score = scoreWordGroup(approximated);
 					this.generator = function () {
@@ -552,7 +602,7 @@ var optimizationMethods = {
 				},
 			};
 
-			var score = scoreWordGroup(getWordGroup(util.noopOptimize));
+			const score = scoreWordGroup(getWordGroup(util.noopOptimize));
 			competition.compete(competitor, score);
 
 			// try all suffixes
@@ -563,6 +613,89 @@ var optimizationMethods = {
 
 		return competition.close();
 	},
+
+	/**
+	 * - abcDef, abcGhi, xyzDef, xyzGhi => (abc|xyz)(Def|Ghi)
+	 * - get, set, getter, setter => (get|set)(|ter)
+	 * @param {string[]} words
+	 * @param {OptimizationOptions} options
+	 * @returns {WordGroupCandidate[]}
+	 */
+	simpleCombination(words, options) {
+		const util = optimizationMethods.util;
+
+		/** @type {Competition.<WordGroupCandidate>} */
+		const competition = new Competition(options.maxCandidates);
+
+		const prefixTree = util.getPrefixTree(words);
+		const suffixTree = util.getSuffixTree(words);
+
+		/**
+		 * @param {string} prefix
+		 */
+		function chooseBest(prefix) {
+			const child = prefixTree.getChild(prefix);
+
+			// at least two prefixed words
+			if (child.count < 2)
+				return;
+
+			const prefixedWords = child.getWords();
+			const remainingWords = prefixTree.getWordsWithoutPrefix(prefix);
+
+			/**
+			 * Returns the word group generated from the current prefix optimized using `optimizer`.
+			 * @param {(words: string[], options: OptimizationOptions) => WordGroup} optimizer
+			 * @returns {WordGroup}
+			 */
+			function getWordGroup(optimizer) {
+				const content = [
+					new WordGroup(prefix, optimizer(prefixedWords, options))
+				];
+
+				if (remainingWords.length) {
+					// optimize
+					const optimized = optimizer(remainingWords, options);
+
+					if (optimized.content === remainingWords && optimized.nothingAfter)
+						// unable to optimize
+						content.push(...remainingWords);
+					else
+						content.push(optimized);
+				}
+
+				return new WordGroup(content);
+			}
+
+
+			/** @type {WordGroupCandidate} */
+			const competitor = {
+				consumedWords: null,
+				generator: null,
+				score: -Infinity,
+				qualified() {
+					const approximated = getWordGroup(util.approximate);
+
+					this.score = scoreWordGroup(approximated);
+					this.generator = function () {
+						if (options.isLookingAhead)
+							return approximated;
+						return getWordGroup(util.optimize);
+					};
+				},
+			};
+
+			const score = scoreWordGroup(getWordGroup(util.noopOptimize));
+			competition.compete(competitor, score);
+
+			// try all prefixes
+			child.forEach(c => chooseBest(prefix + c.char));
+		};
+
+		prefixTree.forEach(c => chooseBest(c.char));
+
+		return competition.close();
+	}
 
 };
 
