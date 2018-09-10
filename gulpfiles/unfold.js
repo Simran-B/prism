@@ -1,4 +1,4 @@
-
+// @ts-check
 
 /**
  *
@@ -7,13 +7,13 @@
  * @returns {RegExp}
  */
 function regexReplace(base, replacements) {
-	var source = base.source;
+	let source = base.source;
 
-	for (var placeholder in replacements) {
-		var placeholderPattern = RegExp(placeholder, "g");
+	for (let placeholder in replacements) {
+		let placeholderPattern = RegExp(placeholder, "g");
 
-		var replacement = replacements[placeholder];
-		var replacementSource = replacement instanceof RegExp ? replacement.source : replacement;
+		let replacement = replacements[placeholder];
+		let replacementSource = replacement instanceof RegExp ? replacement.source : replacement;
 
 		source = source.replace(placeholderPattern, replacementSource);
 	}
@@ -22,7 +22,7 @@ function regexReplace(base, replacements) {
 }
 
 /**
- * 
+ *
  * @param {RegExpExecArray} match
  * @returns {boolean}
  */
@@ -30,17 +30,17 @@ function isOptional(match) {
 	return match != null && match.input[match.index + match[0].length] === "?";
 }
 
-var char = /[^\\(?:)|[\]]/;
+let char = /[^\\(?:)|[\]]/;
 
-var patterns = {
+let patterns = {
 
 	charSet: regexReplace(/\[(char+)\]/, { char: char }),
 	optionalCharacter: regexReplace(/(char)\?/, { char: char }),
 
 	braces: (function () {
-		var bracesBase = /\((?:[^()]|inner)+\)/.source;
-		var braces = bracesBase.replace('|inner', '');
-		for (var i = 0; i < 5; i++)
+		let bracesBase = /\((?:[^()]|inner)+\)/.source;
+		let braces = bracesBase.replace('|inner', '');
+		for (let i = 0; i < 5; i++)
 			braces = bracesBase.replace('inner', braces);
 
 		return regexReplace(/\(\?\:((?:[^()]|braces)+)\)/, { braces: braces });
@@ -50,6 +50,23 @@ var patterns = {
 
 };
 
+/**
+ *
+ * @param {string} list
+ * @returns {string}
+ */
+function preprocessList(list) {
+	return list.replace(/\[([^[\]]+)\]/g, (m, chars) => {
+		return '[' + chars.replace(/\\d/g, '0-9').replace(/(.)-(.)/g, (m, start, stop) => {
+			const chars = [];
+			start = start.charCodeAt(0);
+			stop = stop.charCodeAt(0);
+			for(let i = start; i <= stop; i++)
+				chars.push(String.fromCharCode(i));
+			return chars.join('');
+		}) + ']';
+	}).replace(/\\d/g, '[0123456789]');
+}
 
 /**
  *
@@ -66,6 +83,8 @@ function unfold(list) {
 	if (patterns.simpleWord.test(list))
 		return [list];
 
+	list = preprocessList(list);
+
 	// check for integrity
 	if (list.indexOf('\\') >= 0)
 		throw new Error('Escape sequences are not supported.');
@@ -77,10 +96,10 @@ function unfold(list) {
 		throw new Error('Empty character sets are not supported.')
 
 
-	var words = [];
+	let words = [];
 
-	var wordPattern = regexReplace(/^((?:[^\\():|]|braces)+)(?:$|\|(?=.))/, { braces: patterns.braces });
-	for (var match = null; match = wordPattern.exec(list);) {
+	let wordPattern = regexReplace(/^((?:[^\\():|]|braces)+)(?:$|\|(?=.))/, { braces: patterns.braces });
+	for (let match = null; match = wordPattern.exec(list);) {
 		// add words
 		words.push.apply(words, unfoldWord(match[1]));
 
@@ -100,9 +119,8 @@ function unfold(list) {
  * @returns {string[]} `['gh', 'ghi']`
  */
 function unfoldWord(word) {
-	var before = '', after = '', match = null;
+	let before = '', after = '', match = null;
 	/**
-	 * @param {RegExpExecArray} match
 	 * @param {boolean} [optional]
 	 */
 	function setBeforeAfter(optional) {
@@ -118,14 +136,14 @@ function unfoldWord(word) {
 	// s(?:e|om|tor)e => see some store
 	match = patterns.braces.exec(word);
 	if (match) {
-		var optional = isOptional(match);
+		let optional = isOptional(match);
 		setBeforeAfter(optional);
 
-		var words = [];
+		let words = [];
 		if (optional) words.push(before + after);
 
-		var inners = unfold(match[1]);
-		for (var i = 0, l = inners.length; i < l; i++)
+		let inners = unfold(match[1]);
+		for (let i = 0, l = inners.length; i < l; i++)
 			words.push(before + inners[i] + after);
 
 		return unfoldWordArray(words);
@@ -137,7 +155,7 @@ function unfoldWord(word) {
 	if (match) {
 		setBeforeAfter(false);
 
-		var words = [before + after, before + match[1] + after];
+		let words = [before + after, before + match[1] + after];
 
 		return unfoldWordArray(words);
 	}
@@ -146,14 +164,14 @@ function unfoldWord(word) {
 	// [gsyl]et => get set yet let
 	match = patterns.charSet.exec(word);
 	if (match) {
-		var optional = isOptional(match);
+		let optional = isOptional(match);
 		setBeforeAfter(optional);
 
-		var words = [];
+		let words = [];
 		if (optional) words.push(before + after);
 
-		var set = match[1];
-		for (var i = 0, l = set.length; i < l; i++)
+		let set = match[1];
+		for (let i = 0, l = set.length; i < l; i++)
 			words.push(before + set[i] + after);
 
 		return unfoldWordArray(words);
@@ -168,7 +186,7 @@ function unfoldWord(word) {
  * @returns {string[]}
  */
 function unfoldWordArray(words) {
-	var unfoldedWords = [];
+	let unfoldedWords = [];
 	words.forEach(function (w) {
 		unfoldedWords.push.apply(unfoldedWords, unfoldWord(w));
 	});

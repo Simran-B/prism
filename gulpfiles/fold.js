@@ -1,5 +1,7 @@
+/**-/
 const PrefixTree = require('./prefix-tree');
 const Competition = require('./competition');
+/**/
 
 // @ts-check
 
@@ -53,7 +55,7 @@ function fold(keywords, lookAhead) {
  * @returns {number}
  */
 function scoreWordGroup(wordGroup) {
-	return -wordGroup.flattenContent().length;
+	return -wordGroup.flattenContent().toString().length;
 }
 
 /**
@@ -146,6 +148,10 @@ class WordGroup {
 		return !this.after;
 	}
 
+	get length() {
+		return this.toString().length;
+	}
+
 	/**
 	 *
 	 * @returns {string}
@@ -202,7 +208,40 @@ class WordGroup {
 			//  b) charCount >= 3
 			//     With charCount == 3 and above, "(?:[abc]|words)".length <= "(?:a|b|c|words)" is true.
 
-			const charSet = "[" + words.slice(words.length - charCount, words.length).join("") + "]";
+			const chars = words.slice(words.length - charCount, words.length);
+			chars.sort((a, b) => a.charCodeAt(0) - b.charCodeAt(0));
+
+			// compress runs using '-'
+			const runs = [];
+			let runStart = 0;
+			for (let i = 0; i < chars.length; i++) {
+				if (String.fromCharCode(chars[i].charCodeAt(0) + 1) !== chars[i + 1]) {
+					if (i - runStart >= 3)
+						runs.push([runStart, i]);
+					runStart = i + 1;
+				}
+			}
+
+			for (let i = runs.length - 1; i >= 0; i--) {
+				let start = runs[i][0],
+					stop = runs[i][1];
+
+				let startChar = chars[start],
+					stopChar = chars[stop];
+
+				let range = startChar + '-' + stopChar;
+				if (range === '0-9')
+					range = '\\d';
+
+				chars.splice(start, stop - start + 1, range);
+			}
+
+			let charSet = "[" + chars.join("") + "]";
+			if (charSet === '[\\d]')
+				charSet = '\\d';
+			else if (charSet === '[\\dA-Z_a-z]')
+				charSet = '\\w';
+
 			words.splice(words.length - charCount, charCount, charSet);
 
 			// single character set: [abc]
@@ -212,79 +251,6 @@ class WordGroup {
 
 		// join using alternations: (?:abc|def)
 		return "(?:" + words.join("|") + ")" + optional;
-	}
-
-	/**
-	 *
-	 * @returns {number}
-	 * @memberof WordGroup
-	 */
-	get length() {
-		let score = this.scoreContent();
-
-		let after = this.after;
-		while (after) {
-			score += this.after.scoreContent();
-			after = after.after;
-		}
-
-		return score;
-	}
-
-	scoreContent() {
-		// not an array
-		if (!Array.isArray(this.content))
-			return this.content.length;
-
-		// no content
-		if (this.content.length === 0)
-			throw new Error("No content");
-
-		// only one element: abc
-		if (this.content.length === 1)
-			return this.content[0].length;
-
-		let optional = 0;
-		const lengths = [];
-		this.content.forEach(function (t) {
-			const l = t ? t.length : 0;
-			if (l)
-				lengths.push(l);
-			else
-				optional = 1;
-		});
-
-		// optional single character: a?
-		if (lengths.length === 1 && lengths[0] === 1)
-			return 1 + optional;
-
-		lengths.sort();
-
-		let charCount = 0;
-		for (let l = lengths.length; charCount < l; charCount++)
-			if (lengths[charCount] > 1)
-				break;
-		charCount = Math.min(charCount, lengths.length);
-		if (charCount === lengths.length || charCount >= 3) {
-			// this will only decrease the overall length if either:
-			//  a) charCount === words.length
-			//     In this case, the overhead of (?:words) can be avoided because only one character set will be used.
-			//  b) charCount >= 3
-			//     With charCount == 3 and above, "(?:[abc]|words)".length <= "(?:a|b|c|words)" is true.
-
-			lengths.splice(0, charCount, charCount + 2);
-
-			// single character set: [abc]
-			if (lengths.length === 1)
-				return lengths[0] + optional;
-		}
-
-		// join using alternations: (?:abc|def)
-		let sum = optional + 4; // (?:)
-		for (let i = 0, l = lengths.length; i < l; i++)
-			sum += lengths[i];
-		sum += lengths.length - 1; // |
-		return sum;
 	}
 
 	flattenContent() {
