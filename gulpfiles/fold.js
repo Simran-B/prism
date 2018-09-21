@@ -1,4 +1,4 @@
-/**-/
+/**/
 const PrefixTree = require('./prefix-tree');
 const Competition = require('./competition');
 /**/
@@ -55,7 +55,7 @@ function fold(keywords, lookAhead) {
  * @returns {number}
  */
 function scoreWordGroup(wordGroup) {
-	return -wordGroup.flattenContent().toString().length;
+	return -wordGroup.flattenContent().length;
 }
 
 /**
@@ -149,20 +149,35 @@ class WordGroup {
 	}
 
 	get length() {
-		return this.toString().length;
+		return WordGroup.transformToLength(this.toString(true));
 	}
 
 	/**
 	 *
-	 * @returns {string}
+	 * @static
+	 * @param {string|WordGroup|number} value
+	 * @param {boolean} [transform=true]
+	 * @returns {number}
 	 * @memberof WordGroup
 	 */
-	toString() {
-		let str = this.printContent();
+	static transformToLength(value, transform = true) {
+		if (!transform) return value;
+		if (typeof value === 'number')
+			return value;
+		return value.length;
+	}
+
+	/**
+	 *
+	 * @returns {string|number}
+	 * @memberof WordGroup
+	 */
+	toString(lengthOnly = false) {
+		let str = WordGroup.transformToLength(this.printContent(lengthOnly), lengthOnly);
 
 		let after = this.after;
 		while (after) {
-			str += this.after.printContent();
+			str += WordGroup.transformToLength(this.after.printContent(lengthOnly), lengthOnly);
 			after = after.after;
 		}
 
@@ -171,13 +186,13 @@ class WordGroup {
 
 	/**
 	 *
-	 * @returns {string}
+	 * @returns {string|number}
 	 * @memberof WordGroup
 	 */
-	printContent() {
+	printContent(lengthOnly = false) {
 		// not an array
 		if (!Array.isArray(this.content))
-			return this.content.toString();
+			return this.content.toString(lengthOnly);
 
 		// no content
 		if (this.content.length === 0)
@@ -185,7 +200,7 @@ class WordGroup {
 
 		// only one element: abc
 		if (this.content.length === 1)
-			return this.content[0].toString();
+			return this.content[0].toString(lengthOnly);
 
 		// transform into strings and remove empty strings
 		const words = this.content.map(t => t ? t.toString() : t).filter(t => t);
@@ -198,9 +213,11 @@ class WordGroup {
 			return words[0] + optional;
 
 		// combine single characters into a character set: a b c def => [abc] def
-		words.sort((a, b) => b.length - a.length);
+		let charCount = 0;
+		for (let i = 0, l = words.length; i < l; i++)
+			if (words[i].length === 1)
+				charCount++;
 
-		const charCount = words.reduce((count, value) => value.length === 1 ? count + 1 : count, 0);
 		if (charCount === words.length || charCount >= 3) {
 			// this will only decrease the overall length if either:
 			//  a) charCount === words.length
@@ -208,6 +225,7 @@ class WordGroup {
 			//  b) charCount >= 3
 			//     With charCount == 3 and above, "(?:[abc]|words)".length <= "(?:a|b|c|words)" is true.
 
+			words.sort((a, b) => b.length - a.length);
 			const chars = words.slice(words.length - charCount, words.length);
 			chars.sort((a, b) => a.charCodeAt(0) - b.charCodeAt(0));
 
@@ -250,6 +268,13 @@ class WordGroup {
 		}
 
 		// join using alternations: (?:abc|def)
+		if (lengthOnly) {
+			let len = optional.length + 4 + words.length - 1;
+			for (let i = 0, l = words.length; i < l; i++)
+				len += WordGroup.transformToLength(words[i]);
+			return len;
+		}
+
 		return "(?:" + words.join("|") + ")" + optional;
 	}
 
