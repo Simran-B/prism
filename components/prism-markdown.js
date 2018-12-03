@@ -183,15 +183,7 @@ Prism.hooks.add('after-tokenize', function (env) {
 
 				// this might be a language that Prism does not support
 				var alias = 'language-' + codeLang.content.trim().split(/\s+/)[0].toLowerCase();
-
-				// add alias
-				if (!codeBlock.alias) {
-					codeBlock.alias = [alias];
-				} else if (typeof codeBlock.alias === 'string') {
-					codeBlock.alias = [codeBlock.alias, alias];
-				} else {
-					codeBlock.alias.push(alias);
-				}
+				codeBlock.addAlias(alias);
 			}
 		}
 	}
