@@ -1,13 +1,10 @@
-Prism.languages.css.selector = {
-	pattern: Prism.languages.css.selector,
-	inside: {
-		'pseudo-element': /:(?:after|before|first-letter|first-line|selection)|::[-\w]+/,
-		'pseudo-class': /:[-\w]+(?:\(.*\))?/,
-		'class': /\.[-:.\w]+/,
-		'id': /#[-:.\w]+/,
-		'attribute': /\[[^\]]+\]/
-	}
-};
+Prism.languages.extendInside('css', 'selector', {
+	'pseudo-element': /:(?:after|before|first-letter|first-line|selection)|::[-\w]+/,
+	'pseudo-class': /:[-\w]+(?:\(.*\))?/,
+	'class': /\.[-:.\w]+/,
+	'id': /#[-:.\w]+/,
+	'attribute': /\[[^\]]+\]/
+});
 
 Prism.languages.insertBefore('css', 'property', {
 	'variable': {
