@@ -99,6 +99,37 @@ var _ = _self.Prism = {
 		},
 
 		/**
+		 * Extends the inside of the value with the key `token` in `root` using the tokens of `redef`.
+		 *
+		 * @param {string|Object|Array} root An object or a language id.
+		 * @param {string} token The key of the token for which its inside is to be extended.
+		 * @param {Object} redef The tokens to be inserted.
+		 */
+		extendInside: function extendInside(root, token, redef) {
+			if (typeof root === 'string') {
+				root = _.languages[root];
+			}
+
+			var value = root[token];
+			switch (_.util.type(value)) {
+				case 'RegExp':
+					value = root[token] = { pattern: value };
+					break;
+				case 'Array':
+					for (var i = 0, l = value.length; i < l; i++) {
+						extendInside(value, i, redef);
+					}
+					return;
+			}
+
+			var inside = value.inside || (value.inside = {});
+
+			for (var key in redef) {
+				inside[key] = redef[key];
+			}
+		},
+
+		/**
 		 * Insert a token before another token in a language literal
 		 * As this needs to recreate the object (we cannot actually insert before keys in object literals),
 		 * we cannot just provide an object, we need an object and a key.
