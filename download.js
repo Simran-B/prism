@@ -435,6 +435,68 @@ function update(updatedCategory, updatedId){
 	});
 
 	delayedGenerateCode();
+	updateRecommendations();
+}
+
+function updateRecommendations() {
+	if (updateRecommendations.timerId) {
+		clearTimeout(updateRecommendations.timerId);
+	}
+	updateRecommendations.timerId = setTimeout(function() {
+		updateRecommendations.timerId = 0;
+		updateRecommendationsNow();
+	}, 1);
+}
+
+var recommendations = {
+	'css': 'css-extras',
+	'java': 'javastacktrace',
+	'javascript': [
+		'json',
+		'jsx'
+	],
+	'php': 'php-extras',
+	'typescript': 'tsx'
+};
+
+function updateRecommendationsNow() {
+	var checked = {};
+	var recommended = {};
+
+	console.log('updated recs');
+
+	$$('label[data-id] > input[value]').forEach(function (input) {
+		var label = input.parentElement;
+
+		// remove 'recommended' class
+		label.className = label.className.replace(/(?:^|\s)recommended(?:\s|$)/, '').replace(/\s{2,}/, ' ');
+
+		if (input.checked) {
+			var id = input.value;
+
+			checked[id] = true;
+
+			if (recommendations[id]) {
+				if (typeof recommendations[id] === 'string') {
+					recommended[recommendations[id]] = true;
+				} else {
+					recommendations[id].forEach(function (rec) {
+						recommended[rec] = true;
+					});
+				}
+			}
+		}
+	});
+
+	// remove recommended items which are selected
+	for (var id in checked) {
+		delete recommended[id];
+	}
+
+	// add 'recommended' class
+	for (var id in recommended) {
+		$('label[data-id="' + id + '"]').className += ' recommended';
+	}
 }
 
 var timerId = 0;
