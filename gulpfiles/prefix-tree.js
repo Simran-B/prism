@@ -12,6 +12,7 @@ class PrefixTree {
 		this.parent = parent;
 		this.isWord = false;
 		this.count = 0;
+		this.childCount = 0;
 
 		this._caching = false;
 		this._cachedWords = null;
@@ -159,8 +160,10 @@ class PrefixTree {
 
 			for (let i = 0; i < w.length; i++) {
 				const c = w[i];
-				if (!(c in tree))
+				if (!(c in tree)) {
 					tree[c] = new PrefixTree(c, tree);
+					tree.childCount++;
+				}
 				tree = tree[c];
 				tree.count++;
 			}
