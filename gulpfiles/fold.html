@@ -6,10 +6,6 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<title>Fold test</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<script src="unfold.js"></script>
-	<script src="prefix-tree.js"></script>
-	<script src="competition.js"></script>
-	<script src="fold.js"></script>
 	<style>
 		pre,
 		textarea {
@@ -35,18 +31,23 @@
 <body>
 	<span id="stats"></span>
 	<textarea id="text"></textarea>
-	<input type="number" id="lookAhead" value="0" min="0" max="10" onchange="foldText()" />
+	<input type="number" id="lookAhead" value="0" min="0" max="10" />
 	<label><input type="checkbox" id="live" />Live</label>
-	<button onclick="foldText()">Fold</button>
+	<button id="fold-button">Fold</button>
 	<pre id="fold-output"></pre>
 	<pre id="unfold-output"></pre>
 
-	<script>
+	<script type="module">
+		import { fold, unfold } from './folding.js';
+
 		var text = document.querySelector('#text');
 		var stats = document.querySelector('#stats');
 		var foldOutput = document.querySelector('#fold-output');
 		var unfoldOutput = document.querySelector('#unfold-output');
 		var lookAhead = document.querySelector('#lookAhead');
+
+		lookAhead.onchange = () => foldText();
+		document.querySelector('#fold-button').onclick = () => foldText();
 
 		function foldText() {
 			try {

@@ -1,5 +1,7 @@
 // @ts-check
 
+"use strict";
+
 /**
  *
  * @param {RegExp} base
@@ -73,7 +75,7 @@ function preprocessList(list) {
  * @param {string} list `abc|def|ghi?`
  * @returns {string[]} `['abc', 'def', 'gh', 'ghi']`
  */
-function unfold(list) {
+export function unfold(list) {
 	if (typeof list !== 'string')
 		throw new TypeError('list has to be a string');
 

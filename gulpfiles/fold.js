@@ -1,11 +1,9 @@
-/** /
-const PrefixTree = require('./prefix-tree');
-const Competition = require('./competition');
-/**/
-
 // @ts-check
 
 "use strict";
+
+import { PrefixTree } from './prefix-tree.js';
+import { Competition } from './competition.js';
 
 /**
  *
@@ -13,7 +11,7 @@ const Competition = require('./competition');
  * @param {number} [lookAhead=1]
  * @returns {string} `(?:return?|[gps]et)`
  */
-function fold(keywords, lookAhead) {
+export function fold(keywords, lookAhead) {
 	if (keywords.length === 0)
 		throw new Error('No keywords provided.');
 	if (lookAhead === undefined)
@@ -67,9 +65,10 @@ function scoreWordGroup(wordGroup) {
 
 /**
  * @typedef WordGroupCandidate
- * @property {number} score
- * @property {string[]} consumedWords
- * @property {() => WordGroup} generator
+ * @property {number} score The real score of the candidate.
+ * @property {string[]} consumedWords The words consumed. This might be used to merge disjoint candidates.
+ * @property {() => WordGroup} generator The generator for the word group containing both the consumed and remaining
+ * words.
  */
 
 /**
@@ -447,6 +446,50 @@ const optimizationMethods = {
 
 		const prefixTree = util.getPrefixTree(words);
 
+		/*
+		 * If all words have a common prefix of a certain length it is guaranteed to be beat everything else:
+		 *
+		 * All words separated by |
+		 *   oldLength = words.totalLength + words.count - 1
+		 * With prefix: pre(?:word1|word2|...)
+		 *   newLength = prefix.length + words.totalLength - words.count * prefix.length + words.count + 3
+		 *
+		 * Therefore, the saving of a prefix is at least:
+		 *   savings = oldLength - newLength
+		 *           = (words.count - 1) * prefix.length - 4
+		 */
+		{
+			const word = words[0];
+			let node = prefixTree;
+			let prefixLength = 0;
+			while (node.childCount == 1 && !node.isWord) {
+				node = node[word[prefixLength++]];
+			}
+
+			if ((words.length - 1) * prefixLength - 4 > 0) {
+				const prefix = word.substr(0, prefixLength);
+				const prefixedWords = node.getWords();
+
+				function getWordGroup(optimizer) {
+					return new WordGroup(prefix, optimizer(prefixedWords, options));
+				}
+
+				var approx = getWordGroup(util.approximate);
+
+				return [
+					{
+						consumedWords: null,
+						score: scoreWordGroup(getWordGroup(util.approximate)),
+						generator: () => {
+							if (options.isLookingAhead)
+								return approx;
+							return getWordGroup(util.optimize);
+						}
+					}
+				];
+			}
+		}
+
 		/**
 		 * @param {string} prefix
 		 */
@@ -534,6 +577,60 @@ const optimizationMethods = {
 		const competition = new Competition(options.maxCandidates);
 
 		const suffixTree = util.getSuffixTree(words);
+
+		/*
+		 * If all words have a common suffix of a certain length it is guaranteed to be beat everything else:
+		 *
+		 * All words separated by |
+		 *   oldLength = words.totalLength + words.count - 1
+		 * With suffix: (?:word1|word2|...)suf
+		 *   newLength = suffix.length + words.totalLength - words.count * suffix.length + words.count + 3
+		 *
+		 * Therefore, the saving of a suffix is at least:
+		 *   savings = oldLength - newLength
+		 *           = (words.count - 1) * suffix.length - 4
+		 */
+		{
+			const word = util.reverseString(words[0]);
+			let node = suffixTree;
+			let suffixLength = 0;
+			while (node.childCount == 1 && !node.isWord) {
+				node = node[word[suffixLength++]];
+				if (node === undefined) {
+					debugger;
+				}
+			}
+
+			if ((words.length - 1) * suffixLength - 4 > 0) {
+				const suffix = word.substr(0, suffixLength);
+				const suffixedWords = node.getWords();
+
+				function getWordGroup(optimizer) {
+					let _suffixedWords = suffixedWords;
+
+					// reverse words
+					if (optimizer === util.optimize) {
+						_suffixedWords = util.reverseStrings(_suffixedWords);
+					}
+
+					return new WordGroup(optimizer(_suffixedWords, options), new WordGroup(util.reverseString(suffix)));
+				}
+
+				var approx = getWordGroup(util.approximate);
+
+				return [
+					{
+						consumedWords: null,
+						score: scoreWordGroup(getWordGroup(util.approximate)),
+						generator: () => {
+							if (options.isLookingAhead)
+								return approx;
+							return getWordGroup(util.optimize);
+						}
+					}
+				];
+			}
+		}
 
 		/**
 		 * @param {string} suffix

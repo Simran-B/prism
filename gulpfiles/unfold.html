@@ -6,7 +6,6 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<title>Unfold test</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<script src="unfold.js"></script>
 	<style>
 		pre,
 		textarea {
@@ -30,7 +29,9 @@
 	<textarea id="text"></textarea>
 	<pre id="unfold-output"></pre>
 
-	<script>
+	<script type="module">
+		import { unfold } from './folding.js';
+
 		var text = document.querySelector('#text');
 		var unfoldOutput = document.querySelector('#unfold-output');
 

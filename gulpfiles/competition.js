@@ -1,5 +1,7 @@
 // @ts-check
 
+"use strict";
+
 /**
  * @typedef Competitor
  * @property {(this: T) => void} qualified
@@ -9,7 +11,7 @@
 /**
  * @template T
  */
-class Competition {
+export class Competition {
 
 	constructor(maxCount) {
 		/** @type {{competitor: T & Competitor.<T>, score: number}[]} */
@@ -72,7 +74,3 @@ class Competition {
 	}
 
 }
-
-
-if (typeof module !== 'undefined')
-	module.exports = Competition;

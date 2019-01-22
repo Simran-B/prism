@@ -1,6 +1,8 @@
 // @ts-check
 
-class PrefixTree {
+"use strict";
+
+export class PrefixTree {
 
 	/**
 	 *
@@ -193,7 +195,3 @@ class PrefixTree {
 	}
 
 }
-
-
-if (typeof module !== 'undefined')
-	module.exports = PrefixTree;
