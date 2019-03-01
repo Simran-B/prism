@@ -81,7 +81,7 @@ gulp.task('build', function() {
 		.pipe(gulp.dest('./'));
 });
 
-gulp.task('plugins', ['languages-plugins'], function(cb) {
+function plugins(cb) {
 	pump(
 		[
 			gulp.src(paths.plugins),
@@ -92,7 +92,7 @@ gulp.task('plugins', ['languages-plugins'], function(cb) {
 		],
 		cb
 	);
-});
+}
 
 gulp.task('components-json', function (cb) {
 	componentsPromise.then(function (data) {
@@ -103,8 +103,8 @@ gulp.task('components-json', function (cb) {
 });
 
 gulp.task('watch', function() {
-	gulp.watch(paths.components, ['components', 'build']);
-	gulp.watch(paths.plugins, ['plugins', 'build']);
+	gulp.watch(paths.components, gulp.parallel('components', 'build'));
+	gulp.watch(paths.plugins, gulp.parallel('plugins', 'build'));
 });
 
 gulp.task('languages-plugins', function (cb) {
@@ -190,6 +190,8 @@ gulp.task('languages-plugins', function (cb) {
 	});
 });
 
+gulp.task('plugins', gulp.series('languages-plugins', plugins));
+
 gulp.task('changelog', function (cb) {
 	return gulp.src(paths.changelog)
 		.pipe(replace(
@@ -205,4 +207,4 @@ gulp.task('changelog', function (cb) {
 		.pipe(gulp.dest('.'));
 });
 
-gulp.task('default', ['components', 'components-json', 'plugins', 'build']);
+gulp.task('default', gulp.parallel('components', 'components-json', 'plugins', 'build'));
