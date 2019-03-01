@@ -201,6 +201,7 @@
 		"css-extras": {
 			"title": "CSS Extras",
 			"require": "css",
+			"peerDependencies": "css",
 			"owner": "milesj"
 		},
 		"d": {
@@ -564,6 +565,7 @@
 		"php-extras": {
 			"title": "PHP Extras",
 			"require": "php",
+			"peerDependencies": "php",
 			"owner": "milesj"
 		},
 		"plsql": {

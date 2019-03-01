@@ -140,6 +140,61 @@
 	If there is no hook you can use, you may <a href="https://github.com/PrismJS/prism/issues">request one to be added</a>, detailing why you need it there.
 </section>
 
+<section id="dependencies">
+	<h1>Dependencies</h1>
+
+	<p>Some languages depend on the presence of other languages. For example, JavaScript extends C-like, so C-like has to be present when the JavaScript language definition is created.</p>
+	<pre><code class="language-javascript">Prism.languages.javascript = Prism.languages.extend('clike', { ... });</code></pre>
+	<p>Dependencies describe how components interact with each other and determine the load order of languages and plugins. All dependencies are defined in <code>components.json</code>.</p>
+	<p>There are 3 types of dependencies:</p>
+
+	<dl>
+		<dt><code>require</code></dt>
+		<dd>
+			<p>If a component requires another component, Prism will ensure that the other component is created before the component requiring it is.</p>
+			<p>If a required component is not present already, Prism will load it for you.</p>
+			<p>An example is JavaScript requiring C-like. <code>require</code> is used to ensure that the C-like language is present when the JavaScript language is created. The entry in <code>components.json</code> looks like this:</p>
+			<pre><code class="language-javascript">"javascript": {
+	"title": "JavaScript",
+	"require": "clike",
+	...
+}</code></pre>
+		</dd>
+		<dt><code>after</code></dt>
+		<dd>
+			<p><code>after</code> describes optional dependencies. A component depending on another component with <code>after</code> is guaranteed to be created <i>after</i> the component depended upon. Prism will only ensure the order in which the components are created. It does not ensure that the component depended upon is present.</p>
+			<p>For example, the Show Invisibles plugin uses <code>after</code> to be loaded after some other plugins to be compatible with them. The JSON looks like this:</p>
+			<pre><code class="language-javascript">"show-invisibles": {
+	"title": "Show Invisibles",
+	"after": [
+		"autolinker",
+		"data-uri-highlight"
+	]
+}</code></pre>
+			<p>Please note that an optional dependency is not necessary if the component is already required.</p>
+		</dd>
+		<dt><code>peerDependencies</code></dt>
+		<dd>
+			<p>Peer dependencies are optional dependencies (see <code>after</code>) where the component depended upon is modified.</p>
+			<p>For example, CSS modifies Markup (and HTML) to add highlighted <code>style</code> attributes and tags. The entry in <code>components.json</code> looks like this:</p>
+			<pre><code class="language-javascript">"css": {
+	"title": "CSS",
+	"peerDependencies": "markup",
+	...
+}</code></pre>
+			<p>Peer dependencies can be combined with <code>require</code> to require a component which is then modified.</p>
+			<p>An example of this is CSS Extras which requires and modifies CSS. Its JSON looks like this:</p>
+			<pre><code class="language-javascript">"css-extras": {
+	"title": "CSS Extras",
+	"require": "css",
+	"peerDependencies": "css",
+	...
+}</code></pre>
+		</dd>
+	</dl>
+
+</section>
+
 <section id="api">
 	<h1>API documentation</h1>
 

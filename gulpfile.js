@@ -6,6 +6,7 @@ var gulp   = require('gulp'),
 	replace = require('gulp-replace'),
 	pump = require('pump'),
 	fs = require('fs'),
+	ComponentManager = require('./component-manager'),
 
 	paths  = {
 		componentsFile: 'components.json',
@@ -30,7 +31,12 @@ var gulp   = require('gulp'),
 			encoding: 'utf-8'
 		}, function (err, data) {
 			if (!err) {
-				resolve(JSON.parse(data));
+				try {
+					new ComponentManager(JSON.parse(data));
+					resolve(JSON.parse(data));
+				} catch (error) {
+					reject(error);
+				}
 			} else {
 				reject(err);
 			}
