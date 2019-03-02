@@ -2,7 +2,7 @@
 
 "use strict";
 
-(function () {
+var ComponentManager = (function () {
 
 	/**
 	 * @typedef ComponentBase
@@ -276,6 +276,18 @@
 	};
 
 	/**
+	 * Returns the meta object of the given id.
+	 *
+	 * This is the meat object of the section of the given id.
+	 *
+	 * @param {string} id
+	 * @returns {Meta}
+	 */
+	ComponentManager.prototype.getMeta = function (id) {
+		return this.components[this.getSection(id)].meta;
+	}
+
+	/**
 	 * Returns the title of the given id.
 	 *
 	 * If the given id is an alias and the alias has its own title, then this alias title will be returned.
@@ -357,7 +369,7 @@
 		});
 
 		return res;
-	};
+	}
 
 	/**
 	 * Given a list of components to load and components already loaded, this returns a list of components to be loaded.
@@ -376,9 +388,9 @@
 	 *
 	 * @param {string|string[]} toLoad the list of components to be loaded.
 	 * @param {string[]} [loaded=[]] the list of already loaded components.
-	 * @returns {string[] & { reload: string[] }}
+	 * @returns {{ load: string[], reload: string[] }}
 	 */
-	ComponentManager.prototype.getLoadAndReload = function (toLoad, loaded) {
+	ComponentManager.prototype.getLoad = function (toLoad, loaded) {
 		if (loaded === undefined) {
 			loaded = [];
 		}
@@ -459,11 +471,7 @@
 
 		var reload = Object.keys(reloadSet);
 
-
-		/** @type {any} */
-		var result = sortComponents(this, reload.concat(toLoad));
-		result.reload = reload;
-		return result;
+		return { load: reload.concat(toLoad), reload: reload };
 	};
 
 	/**
@@ -480,10 +488,7 @@
 	ComponentManager.prototype.createDependencyGraph = function (ids) {
 		var manager = this;
 
-		/** @type {Object.<string, boolean>} */
-		var set = {};
-		ids.map(this.resolveAlias.bind(this)).forEach(function (id) { set[id] = true; });
-		ids = Object.keys(set);
+		ids = cleanIds(this, ids);
 
 		/** @type {Graph} */
 		var graph = {};
@@ -541,46 +546,72 @@
 
 	/**
 	 *
-	 * @param {ReadonlyArray.<string>} idsToLoad
-	 * @param {(id: string) => (void | Promise.<void>)} loadFn
-	 * @returns {Promise.<void>}
+	 * @param {Graph} graph
+	 * @param {(id: string) => S} loadFn
+	 * @param {(before: T, after: S) => T} [seriesFn]
+	 * @param {(results: T[]) => T} [parallelFn]
+	 * @returns {T}
+	 * @template T
+	 * @template S
 	 */
-	ComponentManager.prototype.load = function (idsToLoad, loadFn) {
-		var graph = this.createDependencyGraph(idsToLoad);
+	function load(graph, loadFn, seriesFn, parallelFn) {
 		var looseEnds = getLooseEnds(graph);
 
-		/** @type {Object.<string, Promise.<void>>} */
-		var promiseMap = {};
+		/** @type {Object.<string, T>} */
+		var map = {};
 
 		/**
 		 *
 		 * @param {ReadonlyArray.<string>} ids
-		 * @returns {Promise}
+		 * @returns {T}
 		 */
 		function loadIds(ids) {
-			/** @type {Promise.<void>[]} */
-			var promises = [];
-
-			ids.forEach(function (id) {
-				var promise = promiseMap[id];
-				if (!promise) {
+			var results = ids.map(function (id) {
+				var promise = map[id];
+				if (!(id in map)) {
 					var node = graph[id];
 
-					promise = loadIds(node.dependencies).then(function () {
-						return loadFn(id);
-					});
+					var before = loadIds(node.dependencies);
+					var after = loadFn(id);
 
-					promiseMap[id] = promise;
+					promise = seriesFn && seriesFn(before, after);
+
+					map[id] = promise;
 				}
-				promises.push(promise);
+				return promise;
 			});
 
-			return Promise.all(promises);
+			return parallelFn && parallelFn(results);
 		}
 
 		return loadIds(looseEnds);
-	};
+	}
 
+	/**
+	 *
+	 * @param {ReadonlyArray.<string>} idsToLoad
+	 * @param {(id: string) => (void | Promise.<void>)} loadFn
+	 * @returns {Promise.<void>}
+	 */
+	ComponentManager.prototype.loadAsync = function (idsToLoad, loadFn) {
+		/**
+		 * @param {Promise.<void>} before
+		 * @param {Promise.<void> | void} after
+		 * @returns {Promise.<void>}
+		 */
+		function series(before, after) {
+			return before.then(function () { return after; });
+		}
+		/**
+		 * @param {Promise.<void>[]} values
+		 * @returns {Promise.<void>}
+		 */
+		function parallel(values) {
+			return Promise.all(values);
+		}
+
+		return load(this.createDependencyGraph(idsToLoad), loadFn, series, parallel);
+	};
 	/**
 	 *
 	 * @param {ReadonlyArray.<string>} idsToLoad
@@ -588,27 +619,7 @@
 	 * @returns {void}
 	 */
 	ComponentManager.prototype.loadSync = function (idsToLoad, loadFn) {
-		var graph = this.createDependencyGraph(idsToLoad);
-		var looseEnds = getLooseEnds(graph);
-
-		/** @type {Object.<string, boolean>} */
-		var processed = {};
-
-		/**
-		 *
-		 * @param {ReadonlyArray.<string>} ids
-		 */
-		function loadIds(ids) {
-			ids.forEach(function (id) {
-				if (!(id in processed)) {
-					loadIds(graph[id].dependencies);
-					loadFn(id);
-					processed[id] = true;
-				}
-			});
-		}
-
-		loadIds(looseEnds);
+		load(this.createDependencyGraph(idsToLoad), loadFn);
 	};
 
 	/**
@@ -652,13 +663,9 @@
 	};
 
 
-
-	if (typeof window !== 'undefined') {
-		window['ComponentManager'] = ComponentManager;
-	}
-
-	if (typeof module !== 'undefined' && module.exports) {
-		module.exports = ComponentManager;
-	}
-
+	return ComponentManager;
 })();
+
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports = ComponentManager;
+}
