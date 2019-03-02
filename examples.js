@@ -5,6 +5,7 @@
 (function() {
 
 var examples = {};
+var manager = new ComponentManager(components);
 
 var treeURL = 'https://api.github.com/repos/PrismJS/prism/git/trees/master?recursive=1';
 var treePromise = new Promise(function (resolve) {
@@ -170,48 +171,19 @@ function update(id) {
  */
 function loadLanguage (lang)
 {
-	// at first we need to fetch all dependencies for the main language
-	// Note: we need to do this, even if the main language already is loaded (just to be sure..)
-	//
-	// We load an array of all dependencies and call recursively this function on each entry
-	//
-	// dependencies is now an (possibly empty) array of loading-promises
-	var dependencies = getDependenciesOfLanguage(lang).map(loadLanguage);
+	var load = manager.getLoad([lang]).load;
 
-	// We create a promise, which will resolve, as soon as all dependencies are loaded.
-	// They need to be fully loaded because the main language may extend them.
-	return Promise.all(dependencies)
-		.then(function () {
+	return manager.loadAsync(load, function (id) {
+		if (Prism.languages[id]) {
+			// Don't reload languages already loaded.
+			// This basically destroys the load order but it's useful for testing.
+			return Promise.resolve();
+		}
 
-			// If the main language itself isn't already loaded, load it now
-			// and return the newly created promise (we chain the promises).
-			// If the language is already loaded, just do nothing - the next .then()
-			// will immediately be called
-			if (!Prism.languages[lang]) {
-				return new Promise(function (resolve) {
-					$u.script('components/prism-' + lang + '.js', resolve);
-				});
-			}
+		return new Promise(function (resolve) {
+			$u.script('components/prism-' + id + '.js', resolve);
 		});
-}
-
-
-/**
- * Returns all dependencies (as identifiers) of a specific language
- *
- * @param {string} lang
- * @returns {Array.<string>} the list of dependencies. Empty if the language has none.
- */
-function getDependenciesOfLanguage (lang)
-{
-	if (!components.languages[lang] || !components.languages[lang].require)
-	{
-		return [];
-	}
-
-	return ($u.type(components.languages[lang].require) === "array")
-		? components.languages[lang].require
-		: [components.languages[lang].require];
+	});
 }
 
 }());

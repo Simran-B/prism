@@ -1,78 +1,40 @@
-var components = require('../components.js');
-var peerDependentsMap = null;
+const components = require('../components.js');
+const ComponentManager = require('../component-manager');
 
-function getPeerDependentsMap() {
-	var peerDependentsMap = {};
-	Object.keys(components.languages).forEach(function (language) {
-		if (language === 'meta') {
-			return false;
-		}
-		if (components.languages[language].peerDependencies) {
-			var peerDependencies = components.languages[language].peerDependencies;
-			if (!Array.isArray(peerDependencies)) {
-				peerDependencies = [peerDependencies];
-			}
-			peerDependencies.forEach(function (peerDependency) {
-				if (!peerDependentsMap[peerDependency]) {
-					peerDependentsMap[peerDependency] = [];
-				}
-				peerDependentsMap[peerDependency].push(language);
-			});
-		}
-	});
-	return peerDependentsMap;
+const manager = new ComponentManager(components);
+
+
+function getLoadedComponents() {
+	// filter to ignore functions like `extend`
+	return Object.keys(Prism.languages).filter(id => id in manager.flat);
 }
 
-function getPeerDependents(mainLanguage) {
-	if (!peerDependentsMap) {
-		peerDependentsMap = getPeerDependentsMap();
-	}
-	return peerDependentsMap[mainLanguage] || [];
+function removeComponents(id) {
+	delete Prism.languages[id];
+	delete Prism.plugins[id];
 }
 
-function loadLanguages(arr, withoutDependencies) {
-	// If no argument is passed, load all components
-	if (!arr) {
-		arr = Object.keys(components.languages).filter(function (language) {
-			return language !== 'meta';
-		});
-	}
-	if (arr && !arr.length) {
-		return;
-	}
-
-	if (!Array.isArray(arr)) {
+function loadComponents(arr) {
+	if (typeof arr === 'string') {
 		arr = [arr];
 	}
 
-	arr.forEach(function (language) {
-		if (!components.languages[language]) {
-			console.warn('Language does not exist ' + language);
-			return;
-		}
-		// Load dependencies first
-		if (!withoutDependencies && components.languages[language].require) {
-			loadLanguages(components.languages[language].require);
-		}
+	if (!arr) {
+		console.error('Loading all languages by supplying no argument is deprecated.');
+		arr = Object.keys(components.languages).filter(id => id !== 'meta');
+	}
 
-		var pathToLanguage = './prism-' + language;
-		delete require.cache[require.resolve(pathToLanguage)];
-		delete Prism.languages[language];
-		require(pathToLanguage);
+	const { load } = manager.getLoad(arr, getLoadedComponents());
 
-		// Reload dependents
-		var dependents = getPeerDependents(language).filter(function (dependent) {
-			// If dependent language was already loaded,
-			// we want to reload it.
-			if (Prism.languages[dependent]) {
-				delete Prism.languages[dependent];
-				return true;
-			}
-			return false;
-		});
-		if (dependents.length) {
-			loadLanguages(dependents, true);
-		}
+	manager.loadSync(load, id => {
+		// this supports both languages and plugins
+		const metaPath = ComponentManager.insertId(id, manager.getMeta(id).path);
+		const path = '../' + metaPath;
+
+		removeComponents(id);
+		delete require.cache[require.resolve(path)];
+
+		require(path);
 	});
 }
 
