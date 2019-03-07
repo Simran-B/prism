@@ -14,21 +14,27 @@ var ComponentManager = (function () {
 	 * @property {string|string[]} [peerDependencies]
 	 * @property {string|string[]} [after]
 	 * @property {boolean} [noCSS]
-	 *
+	 */
+	/**
 	 * @typedef {ComponentBase & Object.<string, any>} Component
-	 *
+	 */
+	/**
 	 * @typedef MetaBase
 	 * @property {string} path
 	 * @property {string} [link]
 	 * @property {string} [examplePath]
 	 * @property {boolean} [exclusive]
-	 *
+	 */
+	/**
 	 * @typedef {MetaBase & Object.<string, any>} Meta
-	 *
+	 */
+	/**
 	 * @typedef {Object.<string, Component>} FlatComponents
-	 *
+	 */
+	/**
 	 * @typedef {Object.<string, Component | string> & { meta: Meta }} ComponentsSection
-	 *
+	 */
+	/**
 	 * @typedef {Object.<string, ComponentsSection>} Components
 	 */
 	var jsDocTypes;
@@ -42,16 +48,16 @@ var ComponentManager = (function () {
 		this.flat = createFlatComponents(components);
 
 		/** @private */
-		this.__sectionMap = createSectionMap(components);
+		this._sectionMap = createSectionMap(components);
 		/** @private */
-		this.__aliasMap = createAliasMap(this.flat);
+		this._aliasMap = createAliasMap(this.flat);
 		/**
 		 * @private
 		 * @type {Object.<string, Object.<string, ReadonlyArray.<string>>>}
 		 */
-		this.__dependencyMap = {};
+		this._directDependencyCache = {};
 		/** @private */
-		this.__recursiveDependencyMap = createRecursiveDependencyMap(this);
+		this._recursiveDependencyMap = createRecursiveDependencyMap(this);
 	}
 
 
@@ -205,15 +211,15 @@ var ComponentManager = (function () {
 	 * @param {string} dependencyKey
 	 * @returns {ReadonlyArray<string>}
 	 */
-	function getDependencies(manager, id, dependencyKey) {
+	function getDirectDependencies(manager, id, dependencyKey) {
 		id = manager.resolveAlias(id);
 
-		var map = manager.__dependencyMap[dependencyKey];
-		if (!map) {
-			manager.__dependencyMap[dependencyKey] = map = {};
+		var cache = manager._directDependencyCache[dependencyKey];
+		if (!cache) {
+			manager._directDependencyCache[dependencyKey] = cache = {};
 		}
 
-		var dependencies = map[id];
+		var dependencies = cache[id];
 		if (!dependencies) {
 			/** @type {string|string[]|undefined} */
 			var dep = manager.flat[id][dependencyKey];
@@ -233,7 +239,7 @@ var ComponentManager = (function () {
 				});
 			}
 
-			map[id] = dependencies;
+			cache[id] = dependencies;
 		}
 
 		return dependencies;
@@ -260,7 +266,7 @@ var ComponentManager = (function () {
 	 * @returns {string}
 	 */
 	ComponentManager.prototype.resolveAlias = function (id) {
-		return this.__aliasMap[id] || id;
+		return this._aliasMap[id] || id;
 	};
 
 	/**
@@ -272,7 +278,7 @@ var ComponentManager = (function () {
 	 * @returns {string}
 	 */
 	ComponentManager.prototype.getSection = function (id) {
-		return this.__sectionMap[this.resolveAlias(id)];
+		return this._sectionMap[this.resolveAlias(id)];
 	};
 
 	/**
@@ -315,7 +321,7 @@ var ComponentManager = (function () {
 	 * @returns {ReadonlyArray<string>}
 	 */
 	ComponentManager.prototype.getRequire = function (id) {
-		return getDependencies(this, id, 'require');
+		return getDirectDependencies(this, id, 'require');
 	};
 	/**
 	 * Returns the direct peer dependencies of the component with the given id.
@@ -326,7 +332,7 @@ var ComponentManager = (function () {
 	 * @returns {ReadonlyArray<string>}
 	 */
 	ComponentManager.prototype.getPeerDependencies = function (id) {
-		return getDependencies(this, id, 'peerDependencies');
+		return getDirectDependencies(this, id, 'peerDependencies');
 	};
 	/**
 	 * Returns the direct optional dependencies of the component with the given id not including implicit ones.
@@ -337,7 +343,7 @@ var ComponentManager = (function () {
 	 * @returns {ReadonlyArray<string>}
 	 */
 	ComponentManager.prototype.getAfter = function (id) {
-		return getDependencies(this, id, 'after');
+		return getDirectDependencies(this, id, 'after');
 	};
 
 	/**
@@ -347,7 +353,7 @@ var ComponentManager = (function () {
 	 * @returns {boolean} whether `dependent` depends on `dependency`.
 	 */
 	ComponentManager.prototype.dependsOn = function (dependent, dependency) {
-		return this.__recursiveDependencyMap[this.resolveAlias(dependent)][this.resolveAlias(dependency)] === true;
+		return this._recursiveDependencyMap[this.resolveAlias(dependent)][this.resolveAlias(dependency)] === true;
 	};
 
 	/**
@@ -372,13 +378,18 @@ var ComponentManager = (function () {
 	}
 
 	/**
-	 * Given a list of components to load and components already loaded, this returns a list of components to be loaded.
-	 * The returned list contains all require dependencies without any duplicates or aliases and
-	 * is in the order in which the components have to be loaded. It might contain components of `loaded`
-	 * in which case these components have to be reloaded and will be in the `reload` list.
+	 * Given a list of components to load and components already loaded, this returns a list of components to be loaded
+	 * and reloaded.
 	 *
-	 * Components in `toLoad` which are also in `loaded` do not have to be loaded again, but they might have to be
+	 * The `load` list contains all components to load. This includes their require dependencies which are not loaded
+	 * already and the components which have to be reloaded.
+	 *
+	 * The `reload` list is a subset of both `load` and `loaded` and contains only the components which have to be
 	 * reloaded.
+	 *
+	 * Both `load` and `reload` do not contain aliases or duplicates and may be in any order.
+	 *
+	 * Components in `toLoad` which are also in `loaded` will be reloaded.
 	 *
 	 * `loaded` has to be require complete, meaning that if a component x is in `loaded` and x requires y,
 	 * then y will be in `loaded`.
@@ -588,28 +599,27 @@ var ComponentManager = (function () {
 	}
 
 	/**
+	 * @param {Promise.<void>} before
+	 * @param {Promise.<void> | void} after
+	 * @returns {Promise.<void>}
+	 */
+	function series(before, after) {
+		return before.then(function () { return after; });
+	}
+	/**
+	 * @param {Promise.<void>[]} values
+	 * @returns {Promise.<void>}
+	 */
+	function parallel(values) {
+		return Promise.all(values).then(function () { });
+	}
+	/**
 	 *
 	 * @param {ReadonlyArray.<string>} idsToLoad
 	 * @param {(id: string) => (void | Promise.<void>)} loadFn
 	 * @returns {Promise.<void>}
 	 */
 	ComponentManager.prototype.loadAsync = function (idsToLoad, loadFn) {
-		/**
-		 * @param {Promise.<void>} before
-		 * @param {Promise.<void> | void} after
-		 * @returns {Promise.<void>}
-		 */
-		function series(before, after) {
-			return before.then(function () { return after; });
-		}
-		/**
-		 * @param {Promise.<void>[]} values
-		 * @returns {Promise.<void>}
-		 */
-		function parallel(values) {
-			return Promise.all(values);
-		}
-
 		return load(this.createDependencyGraph(idsToLoad), loadFn, series, parallel);
 	};
 	/**
