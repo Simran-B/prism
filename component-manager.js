@@ -378,6 +378,84 @@ var ComponentManager = (function () {
 	}
 
 	/**
+	 *
+	 * @param {ReadonlyArray.<string>} items
+	 * @returns {Object.<string, boolean>}
+	 */
+	function toSet(items) {
+		/** @type {Object.<string, boolean>} */
+		var set = {};
+		items.forEach(function (item) {
+			set[item] = true;
+		});
+		return set;
+	}
+
+	/**
+	 * Returns the components which have to be reloaded.
+	 *
+	 * The returned set has the following properties:
+	 *
+	 * 1. `relaod` ⊇ `toLoad` ∩ `loaded`
+	 * 2. `reload` ⊆ `loaded`
+	 *
+	 * @param {ComponentManager} manager
+	 * @param {ReadonlyArray.<string>} toLoad The components to load. May be in any order.
+	 * @param {ReadonlyArray.<string>} loaded The components which are already loaded. May be in any order.
+	 * @returns {string[]} The components to reload. May be in any order.
+	 */
+	function getReload(manager, toLoad, loaded) {
+		if (loaded.length === 0) {
+			return [];
+		}
+
+		var loadedSet = toSet(loaded);
+
+		/** @type {Object.<string, boolean>} */
+		var reloadSet = {};
+
+
+		// A component x in toLoad has to be reloaded if it is already loaded
+
+		toLoad.forEach(function (id) {
+			if (id in loadedSet) {
+				reloadSet[id] = true;
+			}
+		});
+
+
+		// A component x in loaded has to be reloaded if
+		//  1) a component to load or reload peer-depends on x.
+		//  2) x depends on a component to load or reload.
+
+		// the trick here is that we first check for toLoad which then satisfies all of the toLoad related conditions
+		// and then we only the changes in reload bring new components according to the above conditions
+		var toCheckForReload = toLoad;
+		while (toCheckForReload.length > 0) {
+			var reloadAdditions = {};
+
+			toCheckForReload.forEach(function (id) {
+				manager.getPeerDependencies(id).forEach(function (peer) {
+					if (!(peer in reloadSet) && peer in loadedSet) {
+						reloadAdditions[peer] = true;
+						reloadSet[peer] = true;
+					}
+				});
+			});
+			loaded.forEach(function (id) {
+				if (!(id in reloadSet) && toCheckForReload.some(function (checkId) { return manager.dependsOn(id, checkId); })) {
+					reloadAdditions[id] = true;
+					reloadSet[id] = true;
+				}
+			});
+
+			toCheckForReload = Object.keys(reloadAdditions);
+		}
+
+		return Object.keys(reloadSet);
+	}
+
+	/**
 	 * Given a list of components to load and components already loaded, this returns a list of components to be loaded
 	 * and reloaded.
 	 *
@@ -444,45 +522,13 @@ var ComponentManager = (function () {
 		}
 		toLoad = Object.keys(toLoadSet);
 
-		var that = this;
 
+		var reload = getReload(this, toLoad, loaded);
 
-		// A component x in loaded has to be reloaded if
-		//  1) a component to load or reload peer-depends on x.
-		//  2) x depends on a component to load or reload.
-
-		/** @type {Object.<string, boolean>} */
-		var reloadSet = {};
-
-		if (loaded.length > 0) {
-			// the trick here is that we first check for toLoad which then satisfies all of the toLoad related conditions
-			// and then we only the changes in reload bring new components according to the above conditions
-			var toCheckForReload = toLoad;
-			while (toCheckForReload.length > 0) {
-				var reloadAdditions = {};
-
-				toCheckForReload.forEach(function (id) {
-					that.getPeerDependencies(id).forEach(function (peer) {
-						if (!(peer in reloadSet) && peer in loadedSet) {
-							reloadAdditions[peer] = true;
-							reloadSet[peer] = true;
-						}
-					});
-				});
-				loaded.forEach(function (id) {
-					if (!(id in reloadSet) && toCheckForReload.some(function (checkId) { return that.dependsOn(id, checkId); })) {
-						reloadAdditions[id] = true;
-						reloadSet[id] = true;
-					}
-				});
-
-				toCheckForReload = Object.keys(reloadAdditions);
-			}
-		}
-
-		var reload = Object.keys(reloadSet);
-
-		return { load: reload.concat(toLoad), reload: reload };
+		return {
+			load: Object.keys(toSet(reload.concat(toLoad))),
+			reload: reload
+		};
 	};
 
 	/**
