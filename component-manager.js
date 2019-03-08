@@ -272,26 +272,34 @@ var ComponentManager = (function () {
 	/**
 	 * Returns the section key of the given id. Aliases will be resolved.
 	 *
-	 * Use `this.components[this.getSection(id)].meta` to get the section's meta of an id.
-	 *
 	 * @param {string} id
 	 * @returns {string}
+	 * @see ComponentManager#getAttribute
 	 */
 	ComponentManager.prototype.getSection = function (id) {
 		return this._sectionMap[this.resolveAlias(id)];
 	};
 
 	/**
-	 * Returns the meta object of the given id.
+	 * Returns the value of any attribute of the given id.
 	 *
-	 * This is the meat object of the section of the given id.
+	 * If the entry of the id does not contain the given attribute, the attribute value of the id's section's meta
+	 * will be returned.
 	 *
 	 * @param {string} id
-	 * @returns {Meta}
+	 * @param {string} attr
+	 * @returns {any}
 	 */
-	ComponentManager.prototype.getMeta = function (id) {
-		return this.components[this.getSection(id)].meta;
-	}
+	ComponentManager.prototype.getAttribute = function (id, attr) {
+		id = this.resolveAlias(id);
+
+		var value = this.flat[id];
+		if (attr in value) {
+			return value[attr];
+		}
+
+		return this.components[this.getSection(id)].meta[attr];
+	};
 
 	/**
 	 * Returns the title of the given id.
@@ -356,25 +364,30 @@ var ComponentManager = (function () {
 		return this._recursiveDependencyMap[this.resolveAlias(dependent)][this.resolveAlias(dependency)] === true;
 	};
 
+
 	/**
 	 *
 	 * @param {ComponentManager} manager
-	 * @param {ReadonlyArray<string>} ids
-	 * @returns {string[]}
+	 * @param {string} [source] The name of the source of the given ids. This will only be used for error logging.
+	 * @returns {(id: string) => string | undefined} The function which given an id returns the resolved id or `undefined`.
 	 */
-	function cleanIds(manager, ids) {
-		var set = {};
-		var res = [];
+	function toKnown(manager, source) {
+		source = (source || 'unknown') + ': ';
 
-		ids.forEach(function (id) {
+		return function (id) {
 			id = manager.resolveAlias(id);
-			if (!(id in set)) {
-				res.push(id);
-				set[id] = true;
-			}
-		});
 
-		return res;
+			if (id in manager.flat) {
+				return id;
+			}
+
+			console.error(source + 'Unknown id "' + id + '" will be ignored.');
+			return undefined;
+		};
+	}
+
+	function isDefined(value) {
+		return value !== undefined;
 	}
 
 	/**
@@ -398,11 +411,14 @@ var ComponentManager = (function () {
 	 *
 	 * 1. `relaod` ⊇ `toLoad` ∩ `loaded`
 	 * 2. `reload` ⊆ `loaded`
+	 * 3. `toLoad` = ∅ → `reload` = ∅
+	 *
+	 * Both `toLoad` and `loaded` may be in any order but are now allowed to contain aliases or duplicates.
 	 *
 	 * @param {ComponentManager} manager
-	 * @param {ReadonlyArray<string>} toLoad The components to load. May be in any order.
-	 * @param {ReadonlyArray<string>} loaded The components which are already loaded. May be in any order.
-	 * @returns {string[]} The components to reload. May be in any order.
+	 * @param {ReadonlyArray<string>} toLoad The components to load.
+	 * @param {ReadonlyArray<string>} loaded The components which are already loaded.
+	 * @returns {string[]} The components to reload. May be in any order. Does not contain aliases or duplicates.
 	 */
 	function getReload(manager, toLoad, loaded) {
 		if (loaded.length === 0) {
@@ -475,11 +491,14 @@ var ComponentManager = (function () {
 	 * The component id list `toLoad` and `loaded` may be in any order and may contain any number of duplicates and
 	 * aliases.
 	 *
-	 * @param {string|string[]} toLoad the list of components to be loaded.
-	 * @param {string[]} [loaded=[]] the list of already loaded components.
+	 * @param {string|string[]} toLoad The list of components to be loaded.
+	 * @param {string[]} [loaded=[]] The list of already loaded components.
+	 * @param {object} [options={}] Additional options.
+	 * @param {boolean} [options.forceLoad=false] Whether components in `toLoad` (including require dependencies)
+	 * should be loaded (and reloaded) if they are in `loaded`. By default, components will not be loaded unnecessarily.
 	 * @returns {{ load: string[], reload: string[] }}
 	 */
-	ComponentManager.prototype.getLoad = function (toLoad, loaded) {
+	ComponentManager.prototype.getLoad = function (toLoad, loaded, options) {
 		if (loaded === undefined) {
 			loaded = [];
 		}
@@ -487,39 +506,37 @@ var ComponentManager = (function () {
 			toLoad = [toLoad];
 		}
 
-		var that = this;
+		options = options || {};
+		var forceLoad = !!options.forceLoad;
 
-		/**
-		 * Set of loaded ids.
-		 * @type {Object<string, boolean>}
-		 */
-		var loadedSet = {};
-		loaded.map(this.resolveAlias.bind(this)).forEach(function (id) {
-			if (!(id in that.flat)) {
-				console.error('loaded: Unknown id "' + id + '" will be ignored.');
-			} else if (!(id in loadedSet)) {
-				loadedSet[id] = true;
-			}
-		});
+		var manager = this;
+
+		/** @type {Object<string, boolean>} */
+		var loadedSet = toSet(loaded.map(toKnown(manager, 'loaded')).filter(isDefined));
 		loaded = Object.keys(loadedSet);
 
-		/**
-		 * Set of the component ids to load.
-		 * @type {Object<string, boolean>}
-		 */
+		/** @type {Object<string, boolean>} */
 		var toLoadSet = {};
-		toLoad = toLoad.map(this.resolveAlias.bind(this));
-		while (toLoad.length > 0) {
-			var id = toLoad.pop();
-			if (!(id in that.flat)) {
-				console.error('toLoad: Unknown id "' + id + '" will be ignored.');
-			} else if (!(id in loadedSet || id in toLoadSet)) {
-				toLoadSet[id] = true;
-
-				// add require dependencies
-				Array.prototype.push.apply(toLoad, this.getRequire(id));
+		/**
+		 *
+		 * @param {string} id
+		 */
+		function addRequire(id) {
+			if (id in toLoadSet) {
+				return; // we already got this one.
 			}
+			if (!forceLoad && id in loadedSet) {
+				return; // don't reload components we can avoid to. (unless we're forced to load everything)
+			}
+			// We already checked for circular dependencies when creating this manager, so there shouldn't be any.
+			// Let's just hope and pray that nobody modified our internal variables.
+
+			var require = manager.getRequire(id);
+			require.forEach(function (id) { addRequire(id); });
+
+			toLoadSet[id] = true;
 		}
+		toLoad.map(toKnown(manager, 'loaded')).filter(isDefined).forEach(function (id) { addRequire(id); });
 		toLoad = Object.keys(toLoadSet);
 
 
@@ -536,16 +553,15 @@ var ComponentManager = (function () {
 	 *
 	 * Note that only direct dependencies will be used.
 	 *
+	 * @param {ComponentManager} manager
 	 * @param {ReadonlyArray<string>} ids the list of ids. `ids` is NOT allowed to contain duplicates or aliases.
 	 * @returns {Graph}
 	 *
 	 * @typedef {{id: string, dependencies: ReadonlyArray<string>, dependents: ReadonlyArray<string>}} GraphNode
 	 * @typedef {{[id: string]: GraphNode}} Graph
 	 */
-	ComponentManager.prototype.createDependencyGraph = function (ids) {
-		var manager = this;
-
-		ids = cleanIds(this, ids);
+	function createDependencyGraph(manager, ids) {
+		ids = Object.keys(toSet(ids.map(toKnown(manager, 'ids')).filter(isDefined)));
 
 		/** @type {Graph} */
 		var graph = {};
@@ -582,7 +598,7 @@ var ComponentManager = (function () {
 		});
 
 		return graph;
-	};
+	}
 
 	/**
 	 *
@@ -611,7 +627,7 @@ var ComponentManager = (function () {
 	 * @template T
 	 * @template S
 	 */
-	function load(graph, loadFn, seriesFn, parallelFn) {
+	function loadGraph(graph, loadFn, seriesFn, parallelFn) {
 		var looseEnds = getLooseEnds(graph);
 
 		/** @type {Object<string, T>} */
@@ -661,59 +677,36 @@ var ComponentManager = (function () {
 	}
 	/**
 	 *
-	 * @param {ReadonlyArray<string>} idsToLoad
+	 * @param {ReadonlyArray<string>} ids
 	 * @param {(id: string) => (void | Promise<void>)} loadFn
 	 * @returns {Promise<void>}
 	 */
-	ComponentManager.prototype.loadAsync = function (idsToLoad, loadFn) {
-		return load(this.createDependencyGraph(idsToLoad), loadFn, series, parallel);
+	ComponentManager.prototype.loadAsync = function (ids, loadFn) {
+		return loadGraph(createDependencyGraph(this, ids), loadFn, series, parallel);
 	};
 	/**
 	 *
-	 * @param {ReadonlyArray<string>} idsToLoad
+	 * @param {ReadonlyArray<string>} ids
 	 * @param {(id: string) => void} loadFn
 	 * @returns {void}
 	 */
-	ComponentManager.prototype.loadSync = function (idsToLoad, loadFn) {
-		load(this.createDependencyGraph(idsToLoad), loadFn);
+	ComponentManager.prototype.loadSync = function (ids, loadFn) {
+		loadGraph(createDependencyGraph(this, ids), loadFn);
 	};
 
 	/**
-	 * Returns a reverse topological order of the given dependency graph.
+	 * Returns a reverse topological order of the given dependency components ids.
 	 *
-	 * @param {Graph} graph
+	 * @param {ReadonlyArray<string>} ids
 	 * @returns {string[]}
 	 */
-	ComponentManager.prototype.orderGraph = function (graph) {
-		/** @type {Object<string, number>} */
-		var dependencyCount = {};
-
-		// Kahn's algorithm
-
+	ComponentManager.prototype.order = function (ids) {
 		/** @type {string[]} */
 		var sorted = [];
 
-		/** @type {GraphNode[]} */
-		var roots = [];
-		Object.keys(graph).forEach(function (id) {
-			var node = graph[id];
-			var count = node.dependencies.length;
-			dependencyCount[id] = count;
-			if (count === 0) {
-				roots.push(node);
-			}
+		this.loadSync(ids, function (id) {
+			sorted.push(id);
 		});
-
-		while (roots.length > 0) {
-			var root = roots.pop();
-			sorted.push(root.id);
-
-			root.dependents.forEach(function (dependentId) {
-				if (--dependencyCount[dependentId] === 0) {
-					roots.push(graph[dependentId]);
-				}
-			});
-		}
 
 		return sorted;
 	};

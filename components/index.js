@@ -3,42 +3,49 @@ const ComponentManager = require('../component-manager');
 
 const manager = new ComponentManager(components);
 
+const allLanguages = Object.keys(components.languages).filter(id => id !== 'meta');
+const loaded = new Set(allLanguages.filter(id => components.languages[id].option === 'default'));
 
-function getLoadedComponents() {
-	// filter to ignore functions like `extend`
-	return Object.keys(Prism.languages).filter(id => id in manager.flat);
-}
 
-function removeComponents(id) {
+function removeComponent(id) {
 	delete Prism.languages[id];
 	delete Prism.plugins[id];
 }
 
+/**
+ * Loads the given components synchronously.
+ *
+ * @param {ReadonlyArray<string>} arr
+ */
 function loadComponents(arr) {
-	if (typeof arr === 'string') {
-		arr = [arr];
-	}
 
-	if (!arr) {
-		console.error('Loading all languages by supplying no argument is deprecated.');
-		arr = Object.keys(components.languages).filter(id => id !== 'meta');
-	}
-
-	const { load } = manager.getLoad(arr, getLoadedComponents());
+	const { load } = manager.getLoad(arr, [...loaded]);
+	// We remove any components before loading anyway, so we don't need to handle reloads explicitly.
 
 	manager.loadSync(load, id => {
 		// this supports both languages and plugins
 		const metaPath = ComponentManager.insertId(id, manager.getMeta(id).path);
 		const path = '../' + metaPath;
 
-		removeComponents(id);
+		removeComponent(id);
 		delete require.cache[require.resolve(path)];
 
 		require(path);
+		loaded.add(id);
 	});
 }
 
-module.exports = function (arr) {
-	// Don't expose withoutDependencies
-	loadLanguages(arr);
+/**
+ * Loads the given component(s) synchronously.
+ *
+ * If no components are given, Prism will load all languages.
+ *
+ * @param {string|ReadonlyArray<string>} [components] The ids of the components to load.
+ */
+module.exports = (components = allLanguages) => {
+	if (typeof components === 'string') {
+		components = [components];
+	}
+
+	loadComponents(components);
 };
