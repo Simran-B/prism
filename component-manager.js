@@ -9,14 +9,14 @@ var ComponentManager = (function () {
 	 * @property {string} title
 	 * @property {string} [owner]
 	 * @property {string|string[]} [alias]
-	 * @property {Object.<string, string>} [aliasTitles]
+	 * @property {Object<string, string>} [aliasTitles]
 	 * @property {string|string[]} [require]
 	 * @property {string|string[]} [peerDependencies]
 	 * @property {string|string[]} [after]
 	 * @property {boolean} [noCSS]
 	 */
 	/**
-	 * @typedef {ComponentBase & Object.<string, any>} Component
+	 * @typedef {ComponentBase & Object<string, any>} Component
 	 */
 	/**
 	 * @typedef MetaBase
@@ -26,16 +26,16 @@ var ComponentManager = (function () {
 	 * @property {boolean} [exclusive]
 	 */
 	/**
-	 * @typedef {MetaBase & Object.<string, any>} Meta
+	 * @typedef {MetaBase & Object<string, any>} Meta
 	 */
 	/**
-	 * @typedef {Object.<string, Component>} FlatComponents
+	 * @typedef {Object<string, Component>} FlatComponents
 	 */
 	/**
-	 * @typedef {Object.<string, Component | string> & { meta: Meta }} ComponentsSection
+	 * @typedef {Object<string, Component | string> & { meta: Meta }} ComponentsSection
 	 */
 	/**
-	 * @typedef {Object.<string, ComponentsSection>} Components
+	 * @typedef {Object<string, ComponentsSection>} Components
 	 */
 	var jsDocTypes;
 
@@ -53,7 +53,7 @@ var ComponentManager = (function () {
 		this._aliasMap = createAliasMap(this.flat);
 		/**
 		 * @private
-		 * @type {Object.<string, Object.<string, ReadonlyArray.<string>>>}
+		 * @type {Object<string, Object<string, ReadonlyArray<string>>>}
 		 */
 		this._directDependencyCache = {};
 		/** @private */
@@ -64,10 +64,10 @@ var ComponentManager = (function () {
 	/**
 	 *
 	 * @param {Components} components
-	 * @returns {Object.<string, string>}
+	 * @returns {Object<string, string>}
 	 */
 	function createSectionMap(components) {
-		/** @type {Object.<string, string>} */
+		/** @type {Object<string, string>} */
 		var map = {};
 
 		for (var sectionKey in components) {
@@ -115,7 +115,7 @@ var ComponentManager = (function () {
 	/**
 	 *
 	 * @param {FlatComponents} flatComponents
-	 * @param {Object.<string, string>} [map]
+	 * @param {Object<string, string>} [map]
 	 */
 	function createAliasMap(flatComponents, map) {
 		if (!map) map = {};
@@ -151,17 +151,17 @@ var ComponentManager = (function () {
 	/**
 	 *
 	 * @param {ComponentManager} manager
-	 * @returns {Object.<string, Object.<string, boolean>>}
+	 * @returns {Object<string, Object<string, boolean>>}
 	 */
 	function createRecursiveDependencyMap(manager) {
-		/** @type {Object.<string, Object.<string, boolean>>} */
+		/** @type {Object<string, Object<string, boolean>>} */
 		var map = {};
 
 		/**
 		 *
 		 * @param {string} id
 		 * @param {string[]} [stack]
-		 * @returns {Object.<string, boolean>}
+		 * @returns {Object<string, boolean>}
 		 */
 		function getRecursiveDependencies(id, stack) {
 			if (!stack) {
@@ -177,7 +177,7 @@ var ComponentManager = (function () {
 				return map[id];
 			}
 
-			/** @type {Object.<string, boolean>} */
+			/** @type {Object<string, boolean>} */
 			var deps = {};
 			[manager.getRequire(id), manager.getPeerDependencies(id), manager.getAfter(id)].forEach(function (idDependencies) {
 				idDependencies.forEach(function (dependencyId) {
@@ -359,7 +359,7 @@ var ComponentManager = (function () {
 	/**
 	 *
 	 * @param {ComponentManager} manager
-	 * @param {ReadonlyArray.<string>} ids
+	 * @param {ReadonlyArray<string>} ids
 	 * @returns {string[]}
 	 */
 	function cleanIds(manager, ids) {
@@ -379,11 +379,11 @@ var ComponentManager = (function () {
 
 	/**
 	 *
-	 * @param {ReadonlyArray.<string>} items
-	 * @returns {Object.<string, boolean>}
+	 * @param {ReadonlyArray<string>} items
+	 * @returns {Object<string, boolean>}
 	 */
 	function toSet(items) {
-		/** @type {Object.<string, boolean>} */
+		/** @type {Object<string, boolean>} */
 		var set = {};
 		items.forEach(function (item) {
 			set[item] = true;
@@ -400,8 +400,8 @@ var ComponentManager = (function () {
 	 * 2. `reload` ⊆ `loaded`
 	 *
 	 * @param {ComponentManager} manager
-	 * @param {ReadonlyArray.<string>} toLoad The components to load. May be in any order.
-	 * @param {ReadonlyArray.<string>} loaded The components which are already loaded. May be in any order.
+	 * @param {ReadonlyArray<string>} toLoad The components to load. May be in any order.
+	 * @param {ReadonlyArray<string>} loaded The components which are already loaded. May be in any order.
 	 * @returns {string[]} The components to reload. May be in any order.
 	 */
 	function getReload(manager, toLoad, loaded) {
@@ -411,7 +411,7 @@ var ComponentManager = (function () {
 
 		var loadedSet = toSet(loaded);
 
-		/** @type {Object.<string, boolean>} */
+		/** @type {Object<string, boolean>} */
 		var reloadSet = {};
 
 
@@ -491,7 +491,7 @@ var ComponentManager = (function () {
 
 		/**
 		 * Set of loaded ids.
-		 * @type {Object.<string, boolean>}
+		 * @type {Object<string, boolean>}
 		 */
 		var loadedSet = {};
 		loaded.map(this.resolveAlias.bind(this)).forEach(function (id) {
@@ -505,7 +505,7 @@ var ComponentManager = (function () {
 
 		/**
 		 * Set of the component ids to load.
-		 * @type {Object.<string, boolean>}
+		 * @type {Object<string, boolean>}
 		 */
 		var toLoadSet = {};
 		toLoad = toLoad.map(this.resolveAlias.bind(this));
@@ -536,10 +536,10 @@ var ComponentManager = (function () {
 	 *
 	 * Note that only direct dependencies will be used.
 	 *
-	 * @param {ReadonlyArray.<string>} ids the list of ids. `ids` is NOT allowed to contain duplicates or aliases.
+	 * @param {ReadonlyArray<string>} ids the list of ids. `ids` is NOT allowed to contain duplicates or aliases.
 	 * @returns {Graph}
 	 *
-	 * @typedef {{id: string, dependencies: ReadonlyArray.<string>, dependents: ReadonlyArray.<string>}} GraphNode
+	 * @typedef {{id: string, dependencies: ReadonlyArray<string>, dependents: ReadonlyArray<string>}} GraphNode
 	 * @typedef {{[id: string]: GraphNode}} Graph
 	 */
 	ComponentManager.prototype.createDependencyGraph = function (ids) {
@@ -564,7 +564,7 @@ var ComponentManager = (function () {
 			/** @type {any} */
 			var node = graph[id];
 
-			/** @type {Object.<string, boolean>} */
+			/** @type {Object<string, boolean>} */
 			var processedDeps = {};
 
 			[manager.getRequire(id), manager.getPeerDependencies(id), manager.getAfter(id)].forEach(function (deps) {
@@ -614,12 +614,12 @@ var ComponentManager = (function () {
 	function load(graph, loadFn, seriesFn, parallelFn) {
 		var looseEnds = getLooseEnds(graph);
 
-		/** @type {Object.<string, T>} */
+		/** @type {Object<string, T>} */
 		var map = {};
 
 		/**
 		 *
-		 * @param {ReadonlyArray.<string>} ids
+		 * @param {ReadonlyArray<string>} ids
 		 * @returns {T}
 		 */
 		function loadIds(ids) {
@@ -645,32 +645,32 @@ var ComponentManager = (function () {
 	}
 
 	/**
-	 * @param {Promise.<void>} before
-	 * @param {Promise.<void> | void} after
-	 * @returns {Promise.<void>}
+	 * @param {Promise<void>} before
+	 * @param {Promise<void> | void} after
+	 * @returns {Promise<void>}
 	 */
 	function series(before, after) {
 		return before.then(function () { return after; });
 	}
 	/**
-	 * @param {Promise.<void>[]} values
-	 * @returns {Promise.<void>}
+	 * @param {Promise<void>[]} values
+	 * @returns {Promise<void>}
 	 */
 	function parallel(values) {
 		return Promise.all(values).then(function () { });
 	}
 	/**
 	 *
-	 * @param {ReadonlyArray.<string>} idsToLoad
-	 * @param {(id: string) => (void | Promise.<void>)} loadFn
-	 * @returns {Promise.<void>}
+	 * @param {ReadonlyArray<string>} idsToLoad
+	 * @param {(id: string) => (void | Promise<void>)} loadFn
+	 * @returns {Promise<void>}
 	 */
 	ComponentManager.prototype.loadAsync = function (idsToLoad, loadFn) {
 		return load(this.createDependencyGraph(idsToLoad), loadFn, series, parallel);
 	};
 	/**
 	 *
-	 * @param {ReadonlyArray.<string>} idsToLoad
+	 * @param {ReadonlyArray<string>} idsToLoad
 	 * @param {(id: string) => void} loadFn
 	 * @returns {void}
 	 */
@@ -685,7 +685,7 @@ var ComponentManager = (function () {
 	 * @returns {string[]}
 	 */
 	ComponentManager.prototype.orderGraph = function (graph) {
-		/** @type {Object.<string, number>} */
+		/** @type {Object<string, number>} */
 		var dependencyCount = {};
 
 		// Kahn's algorithm
