@@ -32,7 +32,7 @@ var ComponentManager = (function () {
 	 * @typedef {Object<string, Component>} FlatComponents
 	 */
 	/**
-	 * @typedef {Object<string, Component | string> & { meta: Meta }} ComponentsSection
+	 * @typedef {Object<string, Component | string | Meta>} ComponentsSection
 	 */
 	/**
 	 * @typedef {Object<string, ComponentsSection>} Components
@@ -100,7 +100,7 @@ var ComponentManager = (function () {
 			var section = components[key];
 			for (var id in section) {
 				if (id !== 'meta') {
-					var value = section[id];
+					var value = /** @type {Component|string} */ (section[id]);
 					if (typeof value === 'string') {
 						value = { title: value };
 					}
@@ -281,6 +281,16 @@ var ComponentManager = (function () {
 	};
 
 	/**
+	 * Returns the meta object of the given section.
+	 *
+	 * @param {string} section
+	 * @returns {Meta}
+	 */
+	ComponentManager.prototype.getMeta = function (section) {
+		return /** @type {Meta} */ (this.components[section].meta);
+	};
+
+	/**
 	 * Returns the value of any attribute of the given id.
 	 *
 	 * If the entry of the id does not contain the given attribute, the attribute value of the id's section's meta
@@ -298,7 +308,7 @@ var ComponentManager = (function () {
 			return value[attr];
 		}
 
-		return this.components[this.getSection(id)].meta[attr];
+		return this.getMeta(this.getSection(id))[attr];
 	};
 
 	/**
