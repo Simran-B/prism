@@ -501,8 +501,8 @@ var ComponentManager = (function () {
 	 * The component id list `toLoad` and `loaded` may be in any order and may contain any number of duplicates and
 	 * aliases.
 	 *
-	 * @param {string|string[]} toLoad The list of components to be loaded.
-	 * @param {string[]} [loaded=[]] The list of already loaded components.
+	 * @param {string|ReadonlyArray<string>} toLoad The list of components to be loaded.
+	 * @param {ReadonlyArray<string>} [loaded=[]] The list of already loaded components.
 	 * @param {object} [options={}] Additional options.
 	 * @param {boolean} [options.forceLoad=false] Whether components in `toLoad` (including require dependencies)
 	 * should be loaded (and reloaded) if they are in `loaded`. By default, components will not be loaded unnecessarily.
