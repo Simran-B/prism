@@ -333,7 +333,7 @@
 		"haml": {
 			"title": "Haml",
 			"require": "ruby",
-			"peerDependencies": [
+			"after": [
 				"css",
 				"coffeescript",
 				"erb",
@@ -366,7 +366,7 @@
 		},
 		"http": {
 			"title": "HTTP",
-			"peerDependencies": [
+			"after": [
 				"javascript",
 				"markup"
 			],
@@ -412,7 +412,8 @@
 		"javadoc": {
 			"title": "JavaDoc",
 			"require": ["markup", "java", "javadoclike"],
-			"peerDependencies": [
+			"peerDependencies": "java",
+			"after": [
 				"scala"
 			],
 			"owner": "RunDevelopment"
@@ -438,7 +439,7 @@
 		"jsdoc": {
 			"title": "JSDoc",
 			"require": ["javascript", "javadoclike"],
-			"peerDependencies": [
+			"after": [
 				"actionscript",
 				"coffeescript"
 			],
@@ -447,7 +448,8 @@
 		"js-extras": {
 			"title": "JS Extras",
 			"require": "javascript",
-			"peerDependencies": [
+			"peerDependencies": "javascript",
+			"after": [
 				"actionscript",
 				"coffeescript",
 				"flow",
