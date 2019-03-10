@@ -167,13 +167,13 @@ function update(id) {
  * Loads a language, including all dependencies
  *
  * @param {string} lang the language to load
- * @type {Promise} the promise which resolves as soon as everything is loaded
+ * @returns {Promise} the promise which resolves as soon as everything is loaded
  */
 function loadLanguage (lang)
 {
 	var load = manager.getLoad([lang]).load;
 
-	return manager.loadAsync(load, function (id) {
+	return manager.load(load, function (id) {
 		if (Prism.languages[id]) {
 			// Don't reload languages already loaded.
 			// This basically destroys the load order but it's useful for testing.

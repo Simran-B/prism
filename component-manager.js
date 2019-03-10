@@ -179,7 +179,7 @@ var ComponentManager = (function () {
 
 			/** @type {Object<string, boolean>} */
 			var deps = {};
-			[manager.getRequire(id), manager.getPeerDependencies(id), manager.getAfter(id)].forEach(function (idDependencies) {
+			[manager.getRequireDependencies(id), manager.getPeerDependencies(id), manager.getAfterDependencies(id)].forEach(function (idDependencies) {
 				idDependencies.forEach(function (dependencyId) {
 					deps[dependencyId] = true;
 				})
@@ -338,7 +338,7 @@ var ComponentManager = (function () {
 	 * @param {string} id
 	 * @returns {ReadonlyArray<string>}
 	 */
-	ComponentManager.prototype.getRequire = function (id) {
+	ComponentManager.prototype.getRequireDependencies = function (id) {
 		return getDirectDependencies(this, id, 'require');
 	};
 	/**
@@ -360,7 +360,7 @@ var ComponentManager = (function () {
 	 * @param {string} id
 	 * @returns {ReadonlyArray<string>}
 	 */
-	ComponentManager.prototype.getAfter = function (id) {
+	ComponentManager.prototype.getAfterDependencies = function (id) {
 		return getDirectDependencies(this, id, 'after');
 	};
 
@@ -541,7 +541,7 @@ var ComponentManager = (function () {
 			// We already checked for circular dependencies when creating this manager, so there shouldn't be any.
 			// Let's just hope and pray that nobody modified our internal variables.
 
-			var require = manager.getRequire(id);
+			var require = manager.getRequireDependencies(id);
 			require.forEach(function (id) { addRequire(id); });
 
 			toLoadSet[id] = true;
@@ -593,7 +593,7 @@ var ComponentManager = (function () {
 			/** @type {Object<string, boolean>} */
 			var processedDeps = {};
 
-			[manager.getRequire(id), manager.getPeerDependencies(id), manager.getAfter(id)].forEach(function (deps) {
+			[manager.getRequireDependencies(id), manager.getPeerDependencies(id), manager.getAfterDependencies(id)].forEach(function (deps) {
 				deps.forEach(function (depId) {
 					/** @type {any} */
 					var depNode = graph[depId];
@@ -691,7 +691,7 @@ var ComponentManager = (function () {
 	 * @param {(id: string) => (void | Promise<void>)} loadFn
 	 * @returns {Promise<void>}
 	 */
-	ComponentManager.prototype.loadAsync = function (ids, loadFn) {
+	ComponentManager.prototype.load = function (ids, loadFn) {
 		return loadGraph(createDependencyGraph(this, ids), loadFn, series, parallel);
 	};
 	/**
