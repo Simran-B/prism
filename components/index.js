@@ -24,8 +24,7 @@ function loadComponents(arr) {
 
 	manager.loadSync(load, id => {
 		// this supports both languages and plugins
-		const metaPath = ComponentManager.insertId(id, manager.getMeta(id).path);
-		const path = '../' + metaPath;
+		const path = '../' + ComponentManager.insertId(id, manager.getAttribute(id, 'path'));
 
 		removeComponent(id);
 		delete require.cache[require.resolve(path)];

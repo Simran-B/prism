@@ -546,7 +546,7 @@ var ComponentManager = (function () {
 
 			toLoadSet[id] = true;
 		}
-		toLoad.map(toKnown(manager, 'loaded')).filter(isDefined).forEach(function (id) { addRequire(id); });
+		toLoad.map(toKnown(manager, 'toLoad')).filter(isDefined).forEach(function (id) { addRequire(id); });
 		toLoad = Object.keys(toLoadSet);
 
 
