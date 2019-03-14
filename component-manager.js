@@ -96,7 +96,7 @@ var ComponentManager = (function () {
 		/** @type {FlatComponents} */
 		var flat = {};
 
-		['languages', 'plugins'].forEach(function (key) {
+		for (var key in components) {
 			var section = components[key];
 			for (var id in section) {
 				if (id !== 'meta') {
@@ -107,7 +107,7 @@ var ComponentManager = (function () {
 					flat[id] = value;
 				}
 			}
-		});
+		}
 
 		return flat;
 	}
