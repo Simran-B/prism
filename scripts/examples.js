@@ -113,7 +113,7 @@ function buildContentsHeader(id) {
 	}
 	if (language.alias) {
 		var alias = language.alias;
-		if (Prism.util.type(alias) !== 'Array') {
+		if (!Array.isArray(alias)) {
 			alias = [alias];
 		}
 
@@ -128,7 +128,7 @@ function buildContentsHeader(id) {
 	}
 	if (language.require) {
 		var require = language.require;
-		if (Prism.util.type(require) !== 'Array') {
+		if (!Array.isArray(require)) {
 			require = [require];
 		}
 
