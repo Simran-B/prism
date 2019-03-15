@@ -10,6 +10,8 @@ var minified = true;
 
 var dependencies = {};
 
+var manager = new ComponentManager(components);
+
 var treeURL = 'https://api.github.com/repos/PrismJS/prism/git/trees/master?recursive=1';
 var treePromise = new Promise(function(resolve) {
 	$u.xhr({
@@ -27,13 +29,13 @@ if (hstr) {
 	hstr.forEach(function(str) {
 		var kv = str.split('=', 2),
 		    category = kv[0],
-		    ids = kv[1].split('+');
+			ids = kv[1].split('+');
+
 		if (category !== 'meta' && category !== 'core' && components[category]) {
 			for (var id in components[category]) {
-				if (components[category][id].option) {
-					delete components[category][id].option;
-				}
+				delete components[category][id].option;
 			}
+
 			if (category === 'themes' && ids.length) {
 				var themeInput = $('#theme input[value="' + ids[0] + '"]');
 				if (themeInput) {
@@ -41,25 +43,14 @@ if (hstr) {
 				}
 				setTheme(ids[0]);
 			}
-			var makeDefault = function (id) {
-				if (id !== 'meta') {
-					if (components[category][id]) {
-						if (components[category][id].option !== 'default') {
-							if (typeof components[category][id] === 'string') {
-								components[category][id] = { title: components[category][id] }
-							}
-							components[category][id].option = 'default';
-						}
-						if (components[category][id].require) {
-							var deps = components[category][id].require;
-							if (!Array.isArray(deps)) {
-								deps = [deps];
-							}
-							deps.forEach(makeDefault);
-						}
-					}
+
+			function makeDefault(id) {
+				if (id !== 'meta' && components[category][id]) {
+					components[category][id].option = 'default';
+
+					manager.getRequireDependencies(id).forEach(makeDefault);
 				}
-			};
+			}
 			ids.forEach(makeDefault);
 		}
 	});
@@ -313,19 +304,17 @@ function getFilesSizes() {
 				var file = cache[filepath] = cache[filepath] || {};
 
 				if(!file.size) {
-
 					(function(category, id) {
-					getFileSize(filepath).then(function(size) {
-						if(size) {
-							file.size = size;
-							distro.size += file.size;
+						getFileSize(filepath).then(function(size) {
+							if(size) {
+								file.size = size;
+								distro.size += file.size;
 
-							update(category, id);
-						}
-					});
+								update(category, id);
+							}
+						});
 					}(category, id));
-				}
-				else {
+				} else {
 					update(category, id);
 				}
 			});

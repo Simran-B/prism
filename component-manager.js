@@ -102,7 +102,7 @@ var ComponentManager = (function () {
 				if (id !== 'meta') {
 					var value = /** @type {Component|string} */ (section[id]);
 					if (typeof value === 'string') {
-						value = { title: value };
+						section[id] = value = { title: value };
 					}
 					flat[id] = value;
 				}
