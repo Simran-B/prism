@@ -176,7 +176,7 @@ class WordGroup {
 
 		let after = this.after;
 		while (after) {
-			str += WordGroup.transformToLength(this.after.printContent(lengthOnly), lengthOnly);
+			str += WordGroup.transformToLength(after.printContent(lengthOnly), lengthOnly);
 			after = after.after;
 		}
 
