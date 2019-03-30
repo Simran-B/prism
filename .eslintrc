@@ -45,6 +45,20 @@
 	"overrides": [
 		{
 			"files": [
+				"components/*.js",
+			],
+			"rules": {
+				"quotes": [
+					"warn",
+					"single",
+					{
+						"avoidEscape": true,
+					}
+				],
+			},
+		},
+		{
+			"files": [
 				"components/prism-core.js",
 				"prism.js",
 			],
