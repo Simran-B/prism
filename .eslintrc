@@ -12,10 +12,6 @@
 	},
 	"root": true,
 	"rules": {
-		"comma-dangle": [
-			"warn",
-			"only-multiline",
-		],
 //		"indent": [
 //			"error",
 //			"tab",
@@ -41,13 +37,6 @@
 			}
 		],
 		"no-useless-escape": "off",
-//		"quotes": [
-//			"warn",
-//			"single",
-//			{
-//				"avoidEscape": true,
-//			}
-//		],
 		"semi": [
 			"error",
 			"always",
@@ -86,12 +75,6 @@
 			},
 			"parserOptions": {
 				"ecmaVersion": 2015,
-			},
-			"rules": {
-				"comma-dangle": [
-					"error",
-					"always-multiline",
-				],
 			},
 		},
 		{
