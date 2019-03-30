@@ -69,7 +69,11 @@ function lint(cb) {
 		src(['**/*.js', '!node_modules/**'], { base: './' }),
 		eslint(),
 		eslint.format(),
-		eslint.failAfterError(),
+		eslint.results(({ errorCount, warningCount }) => {
+			if (errorCount > 0 || warningCount > 0) {
+				throw new Error(`Linting error!\nFailed with ${errorCount} error(s) and ${warningCount} warning(s).`);
+			}
+		}),
 	], cb);
 }
 
