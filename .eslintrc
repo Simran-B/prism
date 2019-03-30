@@ -12,14 +12,6 @@
 	},
 	"root": true,
 	"rules": {
-//		"indent": [
-//			"error",
-//			"tab",
-//			{
-//				"SwitchCase": 1,
-//				"outerIIFEBody": 0,
-//			}
-//		],
 		"linebreak-style": [
 			"error",
 			"unix",
