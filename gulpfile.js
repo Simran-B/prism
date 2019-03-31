@@ -71,7 +71,15 @@ function lint(cb) {
 		eslint.format(),
 		eslint.results(({ errorCount, warningCount }) => {
 			if (errorCount > 0 || warningCount > 0) {
-				throw new Error(`Linting error!\nFailed with ${errorCount} error(s) and ${warningCount} warning(s).`);
+				let err = new Error(
+					`Failed with ${errorCount} ${
+						errorCount === 1 ? 'error' : 'errors'
+					} and ${warningCount} ${
+						errorCount === 1 ? 'warning' : 'warnings'
+					}.`
+				);
+				err['showStack'] = false;
+				throw err;
 			}
 		}),
 	], cb);

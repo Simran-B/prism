@@ -12,6 +12,10 @@
 	},
 	"root": true,
 	"rules": {
+		"comma-dangle": [
+			"warn",
+			"only-multiline",
+		],
 		"linebreak-style": [
 			"error",
 			"unix",
@@ -38,6 +42,7 @@
 		{
 			"files": [
 				"components/*.js",
+				"gulpfile.js",
 			],
 			"rules": {
 				"quotes": [
