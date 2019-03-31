@@ -12,10 +12,6 @@
 	},
 	"root": true,
 	"rules": {
-		"comma-dangle": [
-			"warn",
-			"only-multiline",
-		],
 		"linebreak-style": [
 			"error",
 			"unix",
