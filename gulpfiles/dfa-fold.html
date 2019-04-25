@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Fold test</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+		pre,
+		textarea {
+			box-sizing: border-box;
+			display: block;
+			font-family: monospace;
+			white-space: pre-wrap;
+			width: 100%;
+			min-width: 100%;
+			max-width: 100%;
+		}
+
+		textarea {
+			height: 10em;
+		}
+
+		span.best-score {
+			color: green;
+		}
+	</style>
+</head>
+
+<body>
+	<span id="stats"></span>
+	<textarea id="text"></textarea>
+	<label><input type="checkbox" id="live" />Live</label>
+	<button id="fold-button">Fold</button>
+	<pre id="fold-output"></pre>
+	<pre id="unfold-output"></pre>
+
+	<script type="module">
+		import { fold } from './dfa-fold.js';
+		import { unfold } from './unfold.js';
+
+
+		var text = document.querySelector('#text');
+		var stats = document.querySelector('#stats');
+		var foldOutput = document.querySelector('#fold-output');
+		var unfoldOutput = document.querySelector('#unfold-output');
+
+		document.querySelector('#fold-button').onclick = () => foldText();
+
+		function foldText() {
+			try {
+				var words = text.value.replace(/\|?[\n\r]+/g, '|');
+				var unfolded = unfold(words);
+				unfoldOutput.innerText = unfolded.join('\n');
+
+				var folded = fold(unfolded);
+				foldOutput.innerHTML = folded;
+
+				// generate stats
+				var scores = { org: words.length, unfolded: unfolded.join('|').length, folded: folded.length };
+				var best = Math.min(scores.org, scores.unfolded, scores.folded);
+				function style(score) {
+					if (score == best)
+						return '<span class="best-score">' + score + '</span>';
+					return score;
+				}
+
+				var statText = 'Words: ' + unfolded.length + ' || ';
+				statText += ' Original: ' + style(scores.org) + 'c\t Unfolded: ' + style(scores.unfolded) + 'c\t Folded: ' + style(scores.folded) + 'c (' + (Math.round(scores.folded / scores.org * 100 * 10) / 10) + '%)';
+
+				stats.innerHTML = statText;
+			} catch (e) {
+				console.error(e);
+				unfoldOutput.innerText = e.message;
+			}
+		}
+
+		var timer;
+		var lastLiveText = null;
+		text.onkeyup = function () {
+			if (!document.querySelector('#live').checked)
+				return;
+			if (text.value == lastLiveText)
+				return;
+			lastLiveText = text.value;
+
+			clearTimeout(timer);
+			timer = setTimeout(foldText, 100);
+		}
+	</script>
+</body>
+
+</html>

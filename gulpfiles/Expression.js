@@ -52,7 +52,11 @@ export class Expression {
 		}
 
 		if (expression.content.length === 0) {
-			throw new Error('An expressions has to have at least one element');
+			if (expression instanceof Concatenation) {
+				return "";
+			} else {
+				return expression;
+			}
 		}
 
 		if (expression.content.length === 1) {
@@ -61,7 +65,7 @@ export class Expression {
 
 		if (expression instanceof Alternation) {
 			/** @type {(string|Expression)[]} */
-			const content = [];
+			let content = [];
 
 			for (let e of expression.content) {
 				e = Expression.optimize(e);
@@ -73,24 +77,57 @@ export class Expression {
 				}
 			}
 
+			// filter duplicates
+			const contains = new Set();
+			content = content.filter(e => {
+				const str = e.toString();
+				if (contains.has(str)) {
+					return false;
+				} else {
+					contains.add(str);
+					return true;
+				}
+			});
+
+			if (content.length === 1) {
+				return content[0];
+			}
+
 			return new Alternation(content);
 		}
 
 		if (expression instanceof Concatenation) {
 			/** @type {(string|Expression)[]} */
-			const content = [];
+			let content = [];
 
 			for (let e of expression.content) {
 				e = Expression.optimize(e);
 
 				if (e instanceof Concatenation) {
 					content.push(...e.content);
-				} else {
+				} else if (e !== "") {
 					content.push(e);
 				}
 			}
 
-			return new Concatenation(content);
+			// join strings
+			content = content.reduce((acc, curr) => {
+				const lastIsString = typeof acc[acc.length - 1] === "string";
+				if (!lastIsString || typeof curr !== "string") {
+					acc.push(curr);
+				} else {
+					acc.push(acc.pop() + curr);
+				}
+				return acc;
+			}, /** @type {(string | Expression)[]} */ ([]));
+
+			if (content.length === 0) {
+				return "";
+			} else if (content.length === 1) {
+				return content[0];
+			} else {
+				return new Concatenation(content);
+			}
 		}
 
 		throw new TypeError('Invalid type.');
@@ -201,15 +238,15 @@ export class Alternation extends Expression {
 export class Concatenation extends Expression {
 
 	toString() {
-		if (this.content.length === 0) {
-			throw new Error('A concatenation has to have at least one element');
-		}
-
 		var res = '';
 		for (var e of this.content) {
 			res += e.toString();
 		}
 		return res;
+	}
+
+	static empty() {
+		return new Concatenation([]);
 	}
 
 }
